@@ -1,0 +1,1151 @@
+@{
+    ViewData["Title"] = "Grid Pairs History";
+    ViewData["PageTitle"] = "Grid Pairs History (Last 16 Weeks)";
+}
+
+<div class="container-fluid mt-4">
+    <div class="text-center mb-4">
+        <img src="/Images/SchwabGridPairsHistDash.png" alt="Grid Pairs History" class="img-fluid" style="max-width: 600px" />
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            @Html.Partial("_DashboardNav")
+
+            @Html.Partial("_AccountInputs")
+
+            <div class="card mb-4 bg-warning bg-opacity-10">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Grid Pairs Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Two grid pair groups are tracked:</strong></p>
+                    <ul class="mb-0">
+                        <li><strong>Pair 1:</strong> FBTC (100 shares) + MSTR (45 shares)</li>
+                        <li><strong>Pair 2:</strong> BTC (260 shares) + MSTR (60 shares) </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Current Ratios (Live from EODHD)</h5>
+                </div>
+                <div class="card-body">
+                    <div id="ratiosLoading" class="text-center py-3">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Loading current prices...
+                    </div>
+                    <div id="ratiosContainer" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Ratio</th>
+                                        <th>Numerator</th>
+                                        <th>Numerator Price</th>
+                                        <th>Denominator</th>
+                                        <th>Denominator Price</th>
+                                        <th>Current Ratio</th>
+                                        <th>Daily Change</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ratiosTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="ratiosError" class="alert alert-danger mb-0" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Schwab Ratios (Live Bid/Ask)</h5>
+                </div>
+                <div class="card-body">
+                    <div id="schwabRatiosLoading" class="text-center py-3">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Loading Schwab quotes...
+                    </div>
+                    <div id="schwabRatiosContainer" style="display: none;">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">FBTC Prices</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Bid: <strong id="fbtcBid">--</strong></span>
+                                            <span>Ask: <strong id="fbtcAsk">--</strong></span>
+                                            <span>Avg: <strong id="fbtcAvg" class="text-primary">--</strong></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">MSTR Prices</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Bid: <strong id="mstrBid" class="text-success">--</strong></span>
+                                            <span>Ask: <strong id="mstrAsk" class="text-danger">--</strong></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Ratio</th>
+                                        <th>Formula</th>
+                                        <th>FBTC Avg</th>
+                                        <th>MSTR Price</th>
+                                        <th>Ratio Value</th>
+                                        <th>Trade Signal</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="schwabRatiosTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2 text-muted small">
+                            <span id="schwabQuoteTime">--</span>
+                            <span class="ms-3" id="schwabMarketStatus">--</span>
+                        </div>
+                    </div>
+                    <div id="schwabRatiosError" class="alert alert-danger mb-0" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Fetch Grid Pairs History</h5>
+                </div>
+                <div class="card-body">
+                    <form id="transactionForm">
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Reload Grid Pairs</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+            <div id="loadingMessage" class="alert alert-info" style="display: none;">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Loading grid pairs transactions...
+            </div>
+
+            <div class="card mb-3" id="symbolFilterCard" style="display: none;">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <label for="symbolFilter" class="form-label mb-0"><strong>Filter by Pair Group:</strong></label>
+                        </div>
+                        <div class="col-md-9">
+                            <select id="symbolFilter" class="form-select">
+                                <option value="">All Grid Pairs</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="transactionsTableCard" style="display: none;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Grid Pairs Transactions (<span id="transactionCount">0</span>)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Pair</th>
+                                    <th>Symbol 1</th>
+                                    <th>Price 1</th>
+                                    <th>Symbol 2</th>
+                                    <th>Price 2</th>
+                                    <th>Ratio</th>
+                                    <th>Time Diff</th>
+                                    <th>Total Amount</th>
+                                    <th>JSON</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="noTransactionsMessage" class="alert alert-info" style="display: none;">
+                No grid pairs transactions found for the last 16 weeks matching the filter criteria.
+            </div>
+
+            <div class="card mt-4" id="rawDataCard" style="display: none;">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Raw API Response</h5>
+                    <button type="button" id="copyJsonBtn" class="btn btn-outline-light btn-sm">Copy JSON</button>
+                </div>
+                <div class="card-body">
+                    <pre id="rawDataDisplay" class="bg-light p-3" style="max-height: 400px; overflow-y: auto;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for viewing row JSON -->
+<div class="modal fade" id="rowJsonModal" tabindex="-1" aria-labelledby="rowJsonModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="rowJsonModalLabel">Pair Transactions JSON</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="rowJsonDisplay" class="bg-light p-3" style="max-height: 500px; overflow-y: auto;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="copyRowJsonBtn" class="btn btn-primary">Copy JSON</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global variable to store all transactions
+    let allTransactions = [];
+
+    // Copy JSON button handler
+    document.getElementById('copyJsonBtn')?.addEventListener('click', async function() {
+        const jsonText = document.getElementById('rawDataDisplay').textContent;
+        try {
+            await navigator.clipboard.writeText(jsonText);
+            this.textContent = 'Copied!';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        } catch (err) {
+            this.textContent = 'Failed';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        }
+    });
+
+    // Copy row JSON button handler
+    document.getElementById('copyRowJsonBtn')?.addEventListener('click', async function() {
+        const jsonText = document.getElementById('rowJsonDisplay').textContent;
+        try {
+            await navigator.clipboard.writeText(jsonText);
+            this.textContent = 'Copied!';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        } catch (err) {
+            this.textContent = 'Failed';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        }
+    });
+
+    // Delegated click handler for view JSON buttons
+    document.getElementById('transactionsTableBody')?.addEventListener('click', function(e) {
+        if (e.target.classList.contains('view-json-btn')) {
+            const row = e.target.closest('tr');
+            const jsonData = row.dataset.pairJson;
+            const parsedData = JSON.parse(jsonData);
+            const transactionCount = parsedData.length;
+
+            document.getElementById('rowJsonDisplay').textContent = JSON.stringify(parsedData, null, 2);
+            document.getElementById('rowJsonModalLabel').textContent = `Pair Transactions JSON (${transactionCount} transactions)`;
+
+            const modal = new bootstrap.Modal(document.getElementById('rowJsonModal'));
+            modal.show();
+        }
+    });
+
+    // Manual transactions to add to the grid pairs history
+    // These are transactions that were not captured by the API
+    // Each manual transaction needs a unique orderId so they aren't grouped together
+     const MANUAL_TRANSACTIONS = [
+
+     //1 of 3
+         { share amount correct 100 and 45
+            orderId: 'MANUAL_0001',
+            time: '2026-02-19T14:45:53+0000',
+            type: 'TRADE',
+            netAmount: 144.58,
+            transferItems: [{
+                instrument: { symbol: 'MSTR', assetType: 'EQUITY' },
+                amount: -1,
+                price: 144.58
+            }]
+        }
+    ];
+
+    // Grid pairs configuration - defines the two separate pair groups
+    const GRID_PAIR_DEFINITIONS = [
+        {
+            id: 'pair1',
+            name: 'Pair 1: FBTC/MSTR',
+            symbols: {
+                'FBTC': 100,
+                'MSTR': 45
+            }
+        },
+        {
+            id: 'pair2',
+            name: 'Pair 2: BTC/MSTR',
+            symbols: {
+                'BTC': 260,
+                'MSTR': 60
+            }
+        }
+    ];
+
+    // Ratio definitions for the current ratios display
+    const RATIO_DEFINITIONS = [
+        { numerator: 'FBTC', denominator: 'MSTR', name: 'FBTC/MSTR' },
+        { numerator: 'IBIT', denominator: 'MSTR', name: 'IBIT/MSTR' },
+        { numerator: 'GBTC', denominator: 'MSTR', name: 'GBTC/MSTR' },
+        { numerator: 'COIN', denominator: 'MSTR', name: 'COIN/MSTR' },
+        { numerator: 'MARA', denominator: 'CLSK', name: 'MARA/CLSK' }
+    ];
+
+    // Function to load current ratios from EODHD
+    async function loadCurrentRatios() {
+        const priceCache = {};
+        const symbolsNeeded = new Set();
+
+        // Collect all unique symbols needed
+        RATIO_DEFINITIONS.forEach(ratio => {
+            symbolsNeeded.add(ratio.numerator);
+            symbolsNeeded.add(ratio.denominator);
+        });
+
+        try {
+            // Fetch all prices in parallel
+            const fetchPromises = Array.from(symbolsNeeded).map(async (symbol) => {
+                try {
+                    const response = await fetch(`/Schwab/GetStockQuote?symbol=${encodeURIComponent(symbol)}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data && data.close) {
+                            priceCache[symbol] = {
+                                close: data.close,
+                                change: data.change || 0,
+                                change_p: data.change_p || 0
+                            };
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Error fetching ${symbol}:`, err);
+                }
+                return symbol; // Always return something to prevent hanging
+            });
+
+            await Promise.all(fetchPromises);
+            console.log('All prices fetched:', priceCache);
+
+            // Build the ratios table
+            const tbody = document.getElementById('ratiosTableBody');
+            tbody.innerHTML = '';
+
+            RATIO_DEFINITIONS.forEach(ratio => {
+                const numData = priceCache[ratio.numerator];
+                const denomData = priceCache[ratio.denominator];
+
+                const row = document.createElement('tr');
+
+                if (numData && denomData && denomData.close > 0) {
+                    const ratioValue = numData.close / denomData.close;
+
+                    // Calculate ratio change based on previous day's prices
+                    const prevNumClose = numData.close - numData.change;
+                    const prevDenomClose = denomData.close - denomData.change;
+                    const prevRatio = prevDenomClose > 0 ? prevNumClose / prevDenomClose : 0;
+                    const ratioChange = prevRatio > 0 ? ((ratioValue - prevRatio) / prevRatio) * 100 : 0;
+
+                    const changeClass = ratioChange > 0 ? 'text-success' : (ratioChange < 0 ? 'text-danger' : '');
+                    const changePrefix = ratioChange >= 0 ? '+' : '';
+                    const changeIcon = ratioChange > 0 ? '▲' : (ratioChange < 0 ? '▼' : '■');
+
+                    row.innerHTML = `
+                        <td><strong>${ratio.name}</strong></td>
+                        <td>${ratio.numerator}</td>
+                        <td>${numData.close.toFixed(2)} <small class="${numData.change >= 0 ? 'text-success' : 'text-danger'}">(${numData.change >= 0 ? '+' : ''}${numData.change.toFixed(2)})</small></td>
+                        <td>${ratio.denominator}</td>
+                        <td>${denomData.close.toFixed(2)} <small class="${denomData.change >= 0 ? 'text-success' : 'text-danger'}">(${denomData.change >= 0 ? '+' : ''}${denomData.change.toFixed(2)})</small></td>
+                        <td><span class="badge bg-info fs-6">${ratioValue.toFixed(4)}</span></td>
+                        <td class="${changeClass}"><strong>${changeIcon} ${changePrefix}${ratioChange.toFixed(2)}%</strong></td>
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <td><strong>${ratio.name}</strong></td>
+                        <td>${ratio.numerator}</td>
+                        <td class="text-muted">--</td>
+                        <td>${ratio.denominator}</td>
+                        <td class="text-muted">--</td>
+                        <td class="text-muted">--</td>
+                        <td class="text-muted">--</td>
+                    `;
+                }
+
+                tbody.appendChild(row);
+            });
+
+            console.log('Showing ratios container...');
+            document.getElementById('ratiosLoading').style.display = 'none';
+            document.getElementById('ratiosContainer').style.display = 'block';
+
+        } catch (error) {
+            console.error('Error in loadCurrentRatios:', error);
+            document.getElementById('ratiosLoading').style.display = 'none';
+            document.getElementById('ratiosError').textContent = `Error loading ratios: ${error.message}`;
+            document.getElementById('ratiosError').style.display = 'block';
+        }
+    }
+
+    // Function to load Schwab ratios using live bid/ask quotes
+    async function loadSchwabRatios() {
+        const password = sessionStorage.getItem('apiPassword') || '';
+
+        if (!password) {
+            document.getElementById('schwabRatiosLoading').style.display = 'none';
+            document.getElementById('schwabRatiosError').textContent = 'Please enter your API password first';
+            document.getElementById('schwabRatiosError').style.display = 'block';
+            return;
+        }
+
+        try {
+            // Fetch both MSTR and FBTC quotes in parallel
+            const [mstrResponse, fbtcResponse] = await Promise.all([
+                fetch(`/Schwab/GetSchwabQuote?symbol=MSTR&password=${encodeURIComponent(password)}`),
+                fetch(`/Schwab/GetSchwabQuote?symbol=FBTC&password=${encodeURIComponent(password)}`)
+            ]);
+
+            if (!mstrResponse.ok || !fbtcResponse.ok) {
+                throw new Error('Failed to fetch quotes from Schwab');
+            }
+
+            const mstrData = await mstrResponse.json();
+            const fbtcData = await fbtcResponse.json();
+
+            // Extract quote data - Schwab returns { "SYMBOL": { quote: {...} } }
+            const mstrQuote = mstrData.MSTR?.quote;
+            const fbtcQuote = fbtcData.FBTC?.quote;
+
+            if (!mstrQuote || !fbtcQuote) {
+                throw new Error('Invalid quote data received');
+            }
+
+            // Get bid/ask prices - use extended hours prices if available and market is closed
+            // Schwab provides: bidPrice, askPrice, and for extended hours: mark (or use regular if not available)
+            let mstrBid = mstrQuote.bidPrice;
+            let mstrAsk = mstrQuote.askPrice;
+            let fbtcBid = fbtcQuote.bidPrice;
+            let fbtcAsk = fbtcQuote.askPrice;
+
+            // Check if we should use extended hours prices
+            const isRegularMarketOpen = mstrQuote.regularMarketTradeTimeInLong &&
+                (Date.now() - mstrQuote.regularMarketTradeTimeInLong < 30000); // within 30 seconds
+
+            // If market is closed and extended hours prices are available, use them
+            if (!isRegularMarketOpen) {
+                // Use postMarket or mark price if bid/ask are stale
+                if (mstrQuote.postMarketPrice && mstrQuote.postMarketPrice > 0) {
+                    // For after hours, bid/ask might not be available, use mark or last
+                    mstrBid = mstrQuote.bidPrice > 0 ? mstrQuote.bidPrice : mstrQuote.mark || mstrQuote.postMarketPrice;
+                    mstrAsk = mstrQuote.askPrice > 0 ? mstrQuote.askPrice : mstrQuote.mark || mstrQuote.postMarketPrice;
+                }
+                if (fbtcQuote.postMarketPrice && fbtcQuote.postMarketPrice > 0) {
+                    fbtcBid = fbtcQuote.bidPrice > 0 ? fbtcQuote.bidPrice : fbtcQuote.mark || fbtcQuote.postMarketPrice;
+                    fbtcAsk = fbtcQuote.askPrice > 0 ? fbtcQuote.askPrice : fbtcQuote.mark || fbtcQuote.postMarketPrice;
+                }
+            }
+
+            // Calculate average FBTC price
+            const fbtcAvg = (fbtcBid + fbtcAsk) / 2;
+
+            // Update the price displays
+            document.getElementById('fbtcBid').textContent = `${fbtcBid.toFixed(2)}`;
+            document.getElementById('fbtcAsk').textContent = `${fbtcAsk.toFixed(2)}`;
+            document.getElementById('fbtcAvg').textContent = `${fbtcAvg.toFixed(2)}`;
+            document.getElementById('mstrBid').textContent = `${mstrBid.toFixed(2)}`;
+            document.getElementById('mstrAsk').textContent = `${mstrAsk.toFixed(2)}`;
+
+            // Calculate the two ratios
+            const ratioOverBid = fbtcAvg / mstrBid;
+            const ratioOverAsk = fbtcAvg / mstrAsk;
+
+            // Build the ratios table
+            const tbody = document.getElementById('schwabRatiosTableBody');
+            tbody.innerHTML = '';
+
+            // Ratio 1: FBTC Avg / MSTR Bid (what you'd get if selling MSTR)
+            const row1 = document.createElement('tr');
+            row1.className = 'table-success';
+            row1.innerHTML = `
+                <td><strong>FBTC/MSTR Bid</strong></td>
+                <td>FBTC Avg / MSTR Bid</td>
+                <td>${fbtcAvg.toFixed(2)}</td>
+                <td class="text-success">${mstrBid.toFixed(2)} (Bid)</td>
+                <td><span class="badge bg-success fs-6">${ratioOverBid.toFixed(4)}</span></td>
+                <td><em>Sell MSTR at bid</em></td>
+            `;
+            tbody.appendChild(row1);
+
+            // Ratio 2: FBTC Avg / MSTR Ask (what you'd pay if buying MSTR)
+            const row2 = document.createElement('tr');
+            row2.className = 'table-danger';
+            row2.innerHTML = `
+                <td><strong>FBTC/MSTR Ask</strong></td>
+                <td>FBTC Avg / MSTR Ask</td>
+                <td>${fbtcAvg.toFixed(2)}</td>
+                <td class="text-danger">${mstrAsk.toFixed(2)} (Ask)</td>
+                <td><span class="badge bg-danger fs-6">${ratioOverAsk.toFixed(4)}</span></td>
+                <td><em>Buy MSTR at ask</em></td>
+            `;
+            tbody.appendChild(row2);
+
+            // Show quote timestamp and market status
+            const quoteTime = new Date(mstrQuote.quoteTimeInLong || Date.now());
+            document.getElementById('schwabQuoteTime').textContent = `Quote time: ${quoteTime.toLocaleString()}`;
+
+            // Determine market status
+            let marketStatus = '';
+            if (mstrQuote.regularMarketTradeTimeInLong) {
+                const lastTradeTime = new Date(mstrQuote.regularMarketTradeTimeInLong);
+                const now = new Date();
+                const hoursDiff = (now - lastTradeTime) / (1000 * 60 * 60);
+
+                if (hoursDiff < 0.1) {
+                    marketStatus = '<span class="badge bg-success">Market Open</span>';
+                } else if (mstrQuote.postMarketPrice && mstrQuote.postMarketPrice > 0) {
+                    marketStatus = '<span class="badge bg-warning text-dark">Extended Hours</span>';
+                } else {
+                    marketStatus = '<span class="badge bg-secondary">Market Closed</span>';
+                }
+            }
+            document.getElementById('schwabMarketStatus').innerHTML = marketStatus;
+
+            document.getElementById('schwabRatiosLoading').style.display = 'none';
+            document.getElementById('schwabRatiosContainer').style.display = 'block';
+
+        } catch (error) {
+            console.error('Error in loadSchwabRatios:', error);
+            document.getElementById('schwabRatiosLoading').style.display = 'none';
+            document.getElementById('schwabRatiosError').textContent = `Error loading Schwab ratios: ${error.message}`;
+            document.getElementById('schwabRatiosError').style.display = 'block';
+        }
+    }
+
+    // Auto-load transactions if both fields are populated
+    window.addEventListener('DOMContentLoaded', function() {
+        // Load current ratios immediately
+        loadCurrentRatios();
+
+        const savedPassword = sessionStorage.getItem('apiPassword');
+        const savedAccountHash = sessionStorage.getItem('accountHash');
+
+        // Load Schwab ratios if password is available
+        if (savedPassword) {
+            loadSchwabRatios();
+        }
+
+        if (savedPassword && savedAccountHash) {
+            document.getElementById('transactionForm').dispatchEvent(new Event('submit'));
+        }
+    });
+
+    // Symbol filter event listener
+    document.getElementById('symbolFilter')?.addEventListener('change', function() {
+        displayTransactions(allTransactions, this.value);
+    });
+
+    document.getElementById('transactionForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const accountHash = document.getElementById('accountHash').value;
+        const accountHash2 = document.getElementById('accountHash2').value;
+        const password = document.getElementById('password').value;
+
+        // Load Schwab ratios when form is submitted (password is now available)
+        loadSchwabRatios();
+
+        // Hide previous results
+        document.getElementById('errorMessage').style.display = 'none';
+        document.getElementById('transactionsTableCard').style.display = 'none';
+        document.getElementById('symbolFilterCard').style.display = 'none';
+        document.getElementById('noTransactionsMessage').style.display = 'none';
+        document.getElementById('loadingMessage').style.display = 'block';
+
+        try {
+            // Fetch from first account
+            let transactions = [];
+            const response1 = await fetch(`/Schwab/GetTransactionHistory?accountHash=${encodeURIComponent(accountHash)}&password=${encodeURIComponent(password)}&days=112`);
+
+            if (response1.ok) {
+                const data1 = await response1.json();
+                if (Array.isArray(data1)) {
+                    transactions.push(...data1);
+                }
+            }
+
+            // Fetch from second account if populated
+            if (accountHash2) {
+                const response2 = await fetch(`/Schwab/GetTransactionHistory?accountHash=${encodeURIComponent(accountHash2)}&password=${encodeURIComponent(password)}&days=112`);
+                if (response2.ok) {
+                    const data2 = await response2.json();
+                    if (Array.isArray(data2)) {
+                        transactions.push(...data2);
+                    }
+                } else {
+                    console.warn('Account 2 transaction fetch failed:', response2.status, await response2.text());
+                }
+            }
+
+            document.getElementById('loadingMessage').style.display = 'none';
+
+            // Merge manual transactions with API transactions
+            const allApiTransactions = [...transactions, ...MANUAL_TRANSACTIONS];
+
+            // Display raw JSON data
+            document.getElementById('rawDataDisplay').textContent = JSON.stringify(allApiTransactions, null, 2);
+            document.getElementById('rawDataCard').style.display = 'block';
+
+            // Filter transactions to only grid pairs
+            const gridPairsTransactions = filterGridPairsTransactions(allApiTransactions);
+
+            if (!gridPairsTransactions || gridPairsTransactions.length === 0) {
+                document.getElementById('noTransactionsMessage').style.display = 'block';
+                return;
+            }
+
+            // Store transactions globally
+            allTransactions = gridPairsTransactions;
+
+            // Populate symbol filter dropdown
+            populateSymbolFilter(gridPairsTransactions);
+
+            // Display all transactions
+            displayTransactions(gridPairsTransactions, '');
+
+            // Show the filter card
+            document.getElementById('symbolFilterCard').style.display = 'block';
+
+        } catch (error) {
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('errorMessage').textContent = `Error: ${error.message}`;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+    });
+
+    function filterGridPairsTransactions(transactions) {
+        const filtered = [];
+
+        // First, group transactions by orderId and symbol to sum up split transactions
+        const orderGroups = new Map();
+
+        transactions.forEach(transaction => {
+            const equityItem = transaction.transferItems?.find(item =>
+                item.instrument?.assetType === 'EQUITY' ||
+                item.instrument?.assetType === 'OPTION' ||
+                item.instrument?.assetType === 'FUTURE' ||
+                item.instrument?.assetType === 'COLLECTIVE_INVESTMENT'
+            );
+
+            if (!equityItem) return;
+
+            const symbol = equityItem.instrument?.symbol || 'N/A';
+            const orderId = transaction.orderId || transaction.orderDetail?.orderId || 'NONE';
+            const groupKey = `${orderId}_${symbol}`;
+
+            if (orderGroups.has(groupKey)) {
+                const group = orderGroups.get(groupKey);
+                group.totalQuantity += Math.abs(equityItem.amount || 0);
+                group.transactions.push(transaction);
+            } else {
+                orderGroups.set(groupKey, {
+                    symbol: symbol,
+                    orderId: orderId,
+                    totalQuantity: Math.abs(equityItem.amount || 0),
+                    transactions: [transaction]
+                });
+            }
+        });
+
+        // Now check each group's total quantity against pair requirements
+        orderGroups.forEach(group => {
+            // Check which pair(s) this transaction group belongs to
+            const belongsToPairs = [];
+            GRID_PAIR_DEFINITIONS.forEach(pair => {
+                if (pair.symbols[group.symbol] && group.totalQuantity === pair.symbols[group.symbol]) {
+                    belongsToPairs.push(pair.id);
+                }
+            });
+
+            // If transaction group belongs to at least one pair, include all its transactions
+            if (belongsToPairs.length > 0) {
+                group.transactions.forEach(transaction => {
+                    // Clone the transaction and add pair info
+                    const transactionWithPair = { ...transaction, pairIds: belongsToPairs };
+                    filtered.push(transactionWithPair);
+                });
+            }
+        });
+
+        return filtered;
+    }
+
+    function populateSymbolFilter(transactions) {
+        const dropdown = document.getElementById('symbolFilter');
+        dropdown.innerHTML = '<option value="">All Grid Pairs</option>';
+
+        // Add filter option for each pair definition
+        GRID_PAIR_DEFINITIONS.forEach(pair => {
+            const option = document.createElement('option');
+            option.value = pair.id;
+            option.textContent = pair.name;
+            dropdown.appendChild(option);
+        });
+    }
+
+    function displayTransactions(transactions, filterPairId) {
+        // Group transactions by orderId and symbol to sum up split transactions
+        const orderGroups = new Map();
+
+        transactions.forEach(transaction => {
+            const equityItem = transaction.transferItems?.find(item =>
+                item.instrument?.assetType === 'EQUITY' ||
+                item.instrument?.assetType === 'OPTION' ||
+                item.instrument?.assetType === 'FUTURE' ||
+                item.instrument?.assetType === 'COLLECTIVE_INVESTMENT'
+            );
+
+            if (equityItem) {
+                const symbol = equityItem.instrument?.symbol || 'N/A';
+                const orderId = transaction.orderId || 'NONE';
+                const groupKey = `${orderId}_${symbol}`;
+                const pairIds = transaction.pairIds || [];
+
+                if (orderGroups.has(groupKey)) {
+                    const group = orderGroups.get(groupKey);
+                    group.quantity += equityItem.amount || 0;
+                    group.netAmount += transaction.netAmount || 0;
+                    group.rawTransactions.push(transaction);
+                } else {
+                    const tradeTime = new Date(transaction.time || transaction.tradeDate);
+                    orderGroups.set(groupKey, {
+                        symbol: symbol,
+                        price: equityItem.price || 0,
+                        quantity: equityItem.amount || 0,
+                        netAmount: transaction.netAmount || 0,
+                        type: transaction.type,
+                        time: tradeTime,
+                        timestamp: tradeTime.getTime(),
+                        pairIds: pairIds,
+                        rawTransactions: [transaction]
+                    });
+                }
+            }
+        });
+
+        // Convert grouped transactions to array
+        const parsedTransactions = Array.from(orderGroups.values());
+
+        // Sort by time (newest first)
+        parsedTransactions.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Match pairs within 300 seconds, grouped by pair definition
+        const pairsByGroup = {};
+        const unpairedMstrTransactions = []; // Track unpaired MSTR 45-share transactions
+
+        GRID_PAIR_DEFINITIONS.forEach(pairDef => {
+            // Apply filter if selected
+            if (filterPairId && pairDef.id !== filterPairId) {
+                return;
+            }
+
+            pairsByGroup[pairDef.id] = {
+                definition: pairDef,
+                pairs: []
+            };
+
+            const used = new Set();
+
+            for (let i = 0; i < parsedTransactions.length; i++) {
+                if (used.has(i)) continue;
+
+                const trans1 = parsedTransactions[i];
+
+                // Skip if this transaction doesn't belong to current pair definition
+                if (!trans1.pairIds.includes(pairDef.id)) continue;
+
+                // Look for a matching transaction within 300 seconds
+                for (let j = i + 1; j < parsedTransactions.length; j++) {
+                    if (used.has(j)) continue;
+
+                    const trans2 = parsedTransactions[j];
+
+                    // Skip if this transaction doesn't belong to current pair definition
+                    if (!trans2.pairIds.includes(pairDef.id)) continue;
+
+                    const timeDiff = Math.abs(trans2.timestamp - trans1.timestamp) / 1000; // seconds
+
+                    if (timeDiff <= 300 && trans1.symbol !== trans2.symbol) {
+                        // Found a pair!
+                        const symbols = [trans1, trans2].sort((a, b) => a.symbol.localeCompare(b.symbol));
+                        const first = symbols[0];
+                        const second = symbols[1];
+
+                        // Calculate ratio (first alphabetically / second alphabetically)
+                        const ratio = first.price > 0 && second.price > 0 ? (first.price / second.price).toFixed(4) : 'N/A';
+
+                        // Combine all raw transactions from both legs
+                        const allRawTransactions = [
+                            ...first.rawTransactions,
+                            ...second.rawTransactions
+                        ];
+
+                        pairsByGroup[pairDef.id].pairs.push({
+                            first: first,
+                            second: second,
+                            ratio: ratio,
+                            timeDiff: timeDiff.toFixed(1),
+                            totalAmount: trans1.netAmount + trans2.netAmount,
+                            date: trans1.time < trans2.time ? trans1.time : trans2.time,
+                            type: trans1.type,
+                            pairDefId: pairDef.id,
+                            rawTransactions: allRawTransactions
+                        });
+
+                        used.add(i);
+                        used.add(j);
+                        break;
+                    }
+                }
+            }
+
+            // After pairing, find unpaired MSTR 45-share transactions for pair1
+            if (pairDef.id === 'pair1') {
+                for (let i = 0; i < parsedTransactions.length; i++) {
+                    if (used.has(i)) continue;
+
+                    const trans = parsedTransactions[i];
+
+                    // Check if this is an MSTR transaction belonging to pair1
+                    if (trans.pairIds.includes('pair1') && trans.symbol === 'MSTR' && Math.abs(trans.quantity) === 45) {
+                        unpairedMstrTransactions.push({
+                            transaction: trans,
+                            pairDefId: pairDef.id
+                        });
+                    }
+                }
+            }
+        });
+
+        // Display pairs grouped by pair definition
+        const tbody = document.getElementById('transactionsTableBody');
+        tbody.innerHTML = '';
+
+        let totalPairs = 0;
+        let hasAnyPairs = false;
+
+        GRID_PAIR_DEFINITIONS.forEach((pairDef, index) => {
+            const group = pairsByGroup[pairDef.id];
+            const hasUnpairedForThisGroup = pairDef.id === 'pair1' && unpairedMstrTransactions.length > 0;
+
+            if (!group || (group.pairs.length === 0 && !hasUnpairedForThisGroup)) return;
+
+            hasAnyPairs = true;
+            totalPairs += group.pairs.length;
+
+            // Count blue (sell) and orange (buy) rows, and sum total amounts
+            let sellCount = 0;  // blue rows
+            let buyCount = 0;   // orange rows
+            let grandTotal = 0; // sum of all totalAmount values
+            group.pairs.forEach(pair => {
+                if (pair.first.quantity < 0) {
+                    sellCount++;
+                } else {
+                    buyCount++;
+                }
+                grandTotal += pair.totalAmount || 0;
+            });
+
+            // Format grand total
+            const grandTotalFormatted = Math.abs(grandTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const grandTotalClass = grandTotal >= 0 ? 'text-success' : 'text-danger';
+            const grandTotalSign = grandTotal >= 0 ? '+$' : '-$';
+
+            // Add group header row
+            const headerRow = document.createElement('tr');
+            headerRow.className = 'pair-group-header';
+            const unpairedCount = hasUnpairedForThisGroup ? unpairedMstrTransactions.length : 0;
+            const unpairedText = unpairedCount > 0 ? ` | <span class="text-danger">${unpairedCount} UNPAIRED</span>` : '';
+            const rowCountsText = `<span class="ms-3">[ <span style="color: #0096ff; font-weight: bold;">${sellCount} Sells</span> | <span style="color: #ff8c00; font-weight: bold;">${buyCount} Buys</span> ]</span>`;
+            const grandTotalText = `<span class="ms-3 ${grandTotalClass}" style="font-size: 1.1em;"><strong>Total: ${grandTotalSign}${grandTotalFormatted}</strong></span>`;
+            headerRow.innerHTML = `
+                <td colspan="11"><strong>${pairDef.name}</strong> (${group.pairs.length} pairs${unpairedText}) ${rowCountsText} ${grandTotalText}</td>
+            `;
+            tbody.appendChild(headerRow);
+
+            // Add all pairs for this group
+            group.pairs.forEach(pair => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formatDate(pair.date)}</td>
+                    <td><span class="badge bg-${getTypeBadgeClass(pair.type)}">${pair.type}</span></td>
+                    <td><strong>${pair.first.symbol} / ${pair.second.symbol}</strong></td>
+                    <td><strong>${pair.first.symbol}</strong> <span class="badge bg-warning text-dark">${pair.first.quantity}</span></td>
+                    <td><strong>${pair.first.price.toFixed(2)}</strong></td>
+                    <td><strong>${pair.second.symbol}</strong> <span class="badge bg-warning text-dark">${pair.second.quantity}</span></td>
+                    <td><strong>${pair.second.price.toFixed(2)}</strong></td>
+                    <td><span class="ratio-display">${pair.ratio}</span></td>
+                    <td>${pair.timeDiff}s</td>
+                    <td class="${pair.totalAmount >= 0 ? 'text-success' : 'text-danger'}">${formatCurrency(pair.totalAmount)}</td>
+                    <td><button class="btn btn-sm btn-outline-secondary view-json-btn">View</button></td>
+                `;
+
+                // Store all raw transactions as JSON in data attribute
+                row.dataset.pairJson = JSON.stringify(pair.rawTransactions);
+
+                // Add color-coded class based on first transaction's direction
+                // Negative quantity = sell (light blue), Positive quantity = buy (light orange)
+                if (pair.first.quantity < 0) {
+                    row.classList.add('pair-sell');
+                } else {
+                    row.classList.add('pair-buy');
+                }
+
+                tbody.appendChild(row);
+            });
+
+            // Display unpaired MSTR transactions as error rows for pair1
+            if (hasUnpairedForThisGroup) {
+                // Add error section header
+                const errorHeaderRow = document.createElement('tr');
+                errorHeaderRow.className = 'pair-group-header';
+                errorHeaderRow.style.backgroundColor = 'rgba(220, 53, 69, 0.15)';
+                errorHeaderRow.innerHTML = `
+                    <td colspan="11" style="background-color: rgba(220, 53, 69, 0.15); color: #dc3545;"><strong>⚠️ UNPAIRED MSTR TRANSACTIONS (Missing FBTC)</strong></td>
+                `;
+                tbody.appendChild(errorHeaderRow);
+
+                // Add each unpaired transaction as an error row
+                unpairedMstrTransactions.forEach(unpaired => {
+                    const trans = unpaired.transaction;
+                    const row = document.createElement('tr');
+                    row.classList.add('pair-error');
+                    row.innerHTML = `
+                        <td>${formatDate(trans.time)}</td>
+                        <td><span class="badge bg-danger">UNPAIRED</span></td>
+                        <td><strong>MSTR (NO FBTC)</strong></td>
+                        <td colspan="2" class="text-center text-muted">-- Missing FBTC --</td>
+                        <td><strong>MSTR</strong> <span class="badge bg-warning text-dark">${trans.quantity}</span></td>
+                        <td><strong>${trans.price.toFixed(2)}</strong></td>
+                        <td><span class="badge bg-secondary">N/A</span></td>
+                        <td>--</td>
+                        <td class="${trans.netAmount >= 0 ? 'text-success' : 'text-danger'}">${formatCurrency(trans.netAmount)}</td>
+                        <td><button class="btn btn-sm btn-outline-secondary view-json-btn">View</button></td>
+                    `;
+
+                    // Store raw transactions as JSON in data attribute
+                    row.dataset.pairJson = JSON.stringify(trans.rawTransactions);
+
+                    tbody.appendChild(row);
+                });
+            }
+
+            // Add spacer row between groups (except after last group)
+            if (index < GRID_PAIR_DEFINITIONS.length - 1) {
+                const spacerRow = document.createElement('tr');
+                spacerRow.className = 'pair-group-spacer';
+                spacerRow.innerHTML = '<td colspan="11"></td>';
+                tbody.appendChild(spacerRow);
+            }
+        });
+
+        if (!hasAnyPairs) {
+            const row = document.createElement('tr');
+            row.innerHTML = '<td colspan="11" class="text-center">No matched pairs found</td>';
+            tbody.appendChild(row);
+        }
+
+        document.getElementById('transactionCount').textContent = totalPairs;
+        document.getElementById('transactionsTableCard').style.display = 'block';
+    }
+
+    function getTypeBadgeClass(type) {
+        const tradeTypes = ['TRADE', 'BUY', 'SELL'];
+        const dividendTypes = ['DIVIDEND', 'DIVIDEND_OR_INTEREST'];
+        const feeTypes = ['FEE', 'COMMISSION'];
+
+        if (tradeTypes.some(t => type.includes(t))) return 'primary';
+        if (dividendTypes.some(t => type.includes(t))) return 'success';
+        if (feeTypes.some(t => type.includes(t))) return 'warning';
+        return 'secondary';
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleString();
+    }
+
+    function formatCurrency(amount) {
+        if (amount === null || amount === undefined) return 'N/A';
+        const formatted = Math.abs(amount).toFixed(2);
+        return amount >= 0 ? `+${formatted}` : `-${formatted}`;
+    }
+</script>
+
+<style>
+    .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .symbol-total-row {
+        background-color: rgba(255, 193, 7, 0.15) !important;
+        border-top: 2px solid #ffc107 !important;
+        border-bottom: 2px solid #ffc107 !important;
+        font-weight: bold;
+    }
+
+    .symbol-total-row td {
+        background-color: rgba(255, 193, 7, 0.15) !important;
+        padding: 12px 8px !important;
+        font-size: 1.05em;
+    }
+
+    .symbol-total-row:hover {
+        background-color: rgba(255, 193, 7, 0.25) !important;
+    }
+
+    .symbol-spacer-row {
+        height: 15px;
+        background-color: transparent !important;
+    }
+
+    .symbol-spacer-row td {
+        padding: 0 !important;
+        border: none !important;
+        background-color: transparent !important;
+    }
+
+    .symbol-spacer-row:hover {
+        background-color: transparent !important;
+    }
+
+    .pair-group-header {
+        background-color: rgba(13, 110, 253, 0.15) !important;
+        border-top: 3px solid #0d6efd !important;
+        border-bottom: 2px solid #0d6efd !important;
+        font-weight: bold;
+    }
+
+    .pair-group-header td {
+        background-color: rgba(13, 110, 253, 0.15) !important;
+        padding: 14px 8px !important;
+        font-size: 1.1em;
+        color: #0d6efd;
+    }
+
+    .pair-group-header:hover {
+        background-color: rgba(13, 110, 253, 0.25) !important;
+    }
+
+    .pair-group-header:hover td {
+        background-color: rgba(13, 110, 253, 0.25) !important;
+    }
+
+    .pair-group-spacer {
+        height: 20px;
+        background-color: transparent !important;
+    }
+
+    .pair-group-spacer td {
+        padding: 0 !important;
+        border: none !important;
+        background-color: transparent !important;
+    }
+
+    .pair-group-spacer:hover {
+        background-color: transparent !important;
+    }
+
+    .table tr.pair-buy,
+    .table-striped tbody tr.pair-buy,
+    .table tr.pair-buy td {
+        --bs-table-bg: rgba(255, 140, 0, 0.15);
+        --bs-table-bg-state: rgba(255, 140, 0, 0.15);
+        --bs-table-bg-type: rgba(255, 140, 0, 0.15);
+        background-color: rgba(255, 140, 0, 0.15) !important;
+    }
+
+    .table tr.pair-buy:hover,
+    .table tr.pair-buy:hover td,
+    .table-striped tbody tr.pair-buy:hover,
+    .table-striped tbody tr.pair-buy:hover td,
+    .table-hover tbody tr.pair-buy:hover,
+    .table-hover tbody tr.pair-buy:hover td {
+        --bs-table-bg: rgba(255, 140, 0, 0.25);
+        --bs-table-bg-state: rgba(255, 140, 0, 0.25);
+        --bs-table-bg-type: rgba(255, 140, 0, 0.25);
+        background-color: rgba(255, 140, 0, 0.25) !important;
+    }
+
+    .table tr.pair-sell,
+    .table-striped tbody tr.pair-sell,
+    .table tr.pair-sell td {
+        --bs-table-bg: rgba(0, 150, 255, 0.15);
+        --bs-table-bg-state: rgba(0, 150, 255, 0.15);
+        --bs-table-bg-type: rgba(0, 150, 255, 0.15);
+        background-color: rgba(0, 150, 255, 0.15) !important;
+    }
+
+    .table tr.pair-sell:hover,
+    .table tr.pair-sell:hover td,
+    .table-striped tbody tr.pair-sell:hover,
+    .table-striped tbody tr.pair-sell:hover td,
+    .table-hover tbody tr.pair-sell:hover,
+    .table-hover tbody tr.pair-sell:hover td {
+        --bs-table-bg: rgba(0, 150, 255, 0.25);
+        --bs-table-bg-state: rgba(0, 150, 255, 0.25);
+        --bs-table-bg-type: rgba(0, 150, 255, 0.25);
+        background-color: rgba(0, 150, 255, 0.25) !important;
+    }
+
+    .table tr.pair-error,
+    .table-striped tbody tr.pair-error,
+    .table tr.pair-error td {
+        --bs-table-bg: rgba(220, 53, 69, 0.25);
+        --bs-table-bg-state: rgba(220, 53, 69, 0.25);
+        --bs-table-bg-type: rgba(220, 53, 69, 0.25);
+        background-color: rgba(220, 53, 69, 0.25) !important;
+    }
+
+    .table tr.pair-error:hover,
+    .table tr.pair-error:hover td,
+    .table-striped tbody tr.pair-error:hover,
+    .table-striped tbody tr.pair-error:hover td,
+    .table-hover tbody tr.pair-error:hover,
+    .table-hover tbody tr.pair-error:hover td {
+        --bs-table-bg: rgba(220, 53, 69, 0.35);
+        --bs-table-bg-state: rgba(220, 53, 69, 0.35);
+        --bs-table-bg-type: rgba(220, 53, 69, 0.35);
+        background-color: rgba(220, 53, 69, 0.35) !important;
+    }
+
+    .ratio-display {
+        font-size: 1.4em;
+        font-weight: 800;
+        color: #000 !important;
+        background-color: rgba(13, 202, 240, 0.3);
+        padding: 4px 10px;
+        border-radius: 6px;
+        display: inline-block;
+    }
+</style>

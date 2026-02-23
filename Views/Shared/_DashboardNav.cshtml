@@ -1,0 +1,15 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>@ViewData["PageTitle"]</h2>
+    <div>
+        <a asp-controller="Schwab" asp-action="Dashboard" class="btn btn-secondary me-2">Dashboard</a>
+        <a asp-controller="Schwab" asp-action="TradeDash" class="btn btn-primary me-2">Trade Dashboard</a>
+        <a asp-controller="Schwab" asp-action="GridTradeDashboard" class="btn btn-warning me-2">Grid Trade</a>
+        <a asp-controller="Schwab" asp-action="PositionsDashboard" class="btn btn-dark me-2">Positions</a>
+        <a asp-controller="Schwab" asp-action="Orders" class="btn btn-info me-2">Orders</a>
+        <a asp-controller="Schwab" asp-action="TransactionHistory" class="btn btn-success me-2">Transactions</a>
+        <a asp-controller="Schwab" asp-action="GridPairsHistory" class="btn btn-danger me-2">Grid Pairs</a>
+        <a asp-controller="Schwab" asp-action="FillOrKill" class="btn btn-outline-warning">Fill or Kill</a>
+        <a asp-controller="Schwab" asp-action="BuyMstr" class="btn btn-outline-success ms-2">Buy MSTR</a>
+        <a asp-controller="Schwab" asp-action="SellMstr" class="btn btn-outline-danger ms-2">Sell MSTR</a>
+    </div>
+</div>

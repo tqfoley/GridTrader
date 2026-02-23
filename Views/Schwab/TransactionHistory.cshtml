@@ -1,0 +1,491 @@
+@{
+    ViewData["Title"] = "Transaction History";
+    ViewData["PageTitle"] = "Transaction History (Last 3 Weeks)";
+}
+
+<div class="container-fluid mt-4">
+    <div class="text-center mb-4">
+        <img src="/Images/SchwabHistoryDash.png" alt="Schwab Transaction History" class="img-fluid" style="max-width: 600px;" />
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            @Html.Partial("_DashboardNav")
+
+            @Html.Partial("_AccountInputs")
+
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Fetch Transaction History</h5>
+                </div>
+                <div class="card-body">
+                    <form id="transactionForm">
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Reload Transactions</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+            <div id="loadingMessage" class="alert alert-info" style="display: none;">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Loading transactions...
+            </div>
+
+            <div class="card mb-3" id="symbolFilterCard" style="display: none;">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <label for="symbolFilter" class="form-label mb-0"><strong>Filter by Symbol:</strong></label>
+                        </div>
+                        <div class="col-md-9">
+                            <select id="symbolFilter" class="form-select">
+                                <option value="">All Symbols</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="transactionsTableCard" style="display: none;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Transactions (<span id="transactionCount">0</span>)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Symbol</th>
+                                    <th>Description</th>
+                                    <th>Quantity</th>
+                                    <th>Price</th>
+                                    <th>Avg Cost</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>JSON</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="noTransactionsMessage" class="alert alert-info" style="display: none;">
+                No transactions found for the last 3 weeks.
+            </div>
+
+            <div class="card mt-4" id="rawDataCard" style="display: none;">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Raw API Response</h5>
+                    <button type="button" id="copyJsonBtn" class="btn btn-outline-light btn-sm">Copy JSON</button>
+                </div>
+                <div class="card-body">
+                    <pre id="rawDataDisplay" class="bg-light p-3" style="max-height: 400px; overflow-y: auto;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for displaying row JSON -->
+<div class="modal fade" id="rowJsonModal" tabindex="-1" aria-labelledby="rowJsonModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title" id="rowJsonModalLabel">Transaction JSON</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="rowJsonDisplay" class="bg-light p-3" style="max-height: 500px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="copyRowJsonBtn" class="btn btn-primary">Copy JSON</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global variable to store all transactions
+    let allTransactions = [];
+
+    // Copy JSON button handler
+    document.getElementById('copyJsonBtn')?.addEventListener('click', async function() {
+        const jsonText = document.getElementById('rawDataDisplay').textContent;
+        try {
+            await navigator.clipboard.writeText(jsonText);
+            this.textContent = 'Copied!';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        } catch (err) {
+            this.textContent = 'Failed';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        }
+    });
+
+    // Copy row JSON button handler (in modal)
+    document.getElementById('copyRowJsonBtn')?.addEventListener('click', async function() {
+        const jsonText = document.getElementById('rowJsonDisplay').textContent;
+        try {
+            await navigator.clipboard.writeText(jsonText);
+            this.textContent = 'Copied!';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        } catch (err) {
+            this.textContent = 'Failed';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        }
+    });
+
+    // View JSON button click handler (delegated)
+    document.getElementById('transactionsTableBody')?.addEventListener('click', function(e) {
+        if (e.target.classList.contains('view-json-btn')) {
+            const rowId = e.target.getAttribute('data-row-id');
+            const row = document.getElementById(rowId);
+            if (row && row.dataset.transactionJson) {
+                const jsonData = JSON.parse(row.dataset.transactionJson);
+                const transCount = Array.isArray(jsonData) ? jsonData.length : 1;
+                document.getElementById('rowJsonDisplay').textContent = row.dataset.transactionJson;
+                document.getElementById('rowJsonModalLabel').textContent =
+                    transCount > 1 ? `Transaction JSON (${transCount} split transactions)` : 'Transaction JSON';
+                const modal = new bootstrap.Modal(document.getElementById('rowJsonModal'));
+                modal.show();
+            }
+        }
+    });
+
+    // Auto-load transactions if both fields are populated
+    window.addEventListener('DOMContentLoaded', function() {
+        const savedPassword = sessionStorage.getItem('apiPassword');
+        const savedAccountHash = sessionStorage.getItem('accountHash');
+
+        if (savedPassword && savedAccountHash) {
+            document.getElementById('transactionForm').dispatchEvent(new Event('submit'));
+        }
+    });
+
+    // Symbol filter event listener
+    document.getElementById('symbolFilter')?.addEventListener('change', function() {
+        displayTransactions(allTransactions, this.value);
+    });
+
+    document.getElementById('transactionForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const accountHash = document.getElementById('accountHash').value;
+        const accountHash2 = document.getElementById('accountHash2').value;
+        const password = document.getElementById('password').value;
+
+        // Hide previous results
+        document.getElementById('errorMessage').style.display = 'none';
+        document.getElementById('transactionsTableCard').style.display = 'none';
+        document.getElementById('symbolFilterCard').style.display = 'none';
+        document.getElementById('noTransactionsMessage').style.display = 'none';
+        document.getElementById('loadingMessage').style.display = 'block';
+
+        try {
+            // Fetch from first account
+            let transactions = [];
+            console.log('Fetching account 1:', accountHash);
+            const response1 = await fetch(`/Schwab/GetTransactionHistory?accountHash=${encodeURIComponent(accountHash)}&password=${encodeURIComponent(password)}&days=21`);
+
+            if (response1.ok) {
+                const data1 = await response1.json();
+                console.log('Account 1 response:', Array.isArray(data1) ? data1.length + ' transactions' : typeof data1, data1);
+                if (Array.isArray(data1)) {
+                    transactions.push(...data1);
+                }
+            } else {
+                console.warn('Account 1 fetch failed:', response1.status, await response1.text());
+            }
+
+            // Fetch from second account if populated
+            if (accountHash2) {
+                console.log('Fetching account 2:', accountHash2);
+                const response2 = await fetch(`/Schwab/GetTransactionHistory?accountHash=${encodeURIComponent(accountHash2)}&password=${encodeURIComponent(password)}&days=21`);
+                console.log('Account 2 response status:', response2.status);
+                if (response2.ok) {
+                    const data2 = await response2.json();
+                    console.log('Account 2 response:', Array.isArray(data2) ? data2.length + ' transactions' : typeof data2, data2);
+                    if (Array.isArray(data2)) {
+                        transactions.push(...data2);
+                    }
+                } else {
+                    console.warn('Account 2 transaction fetch failed:', response2.status, await response2.text());
+                }
+            } else {
+                console.log('No account 2 configured');
+            }
+
+            console.log('Total combined transactions:', transactions.length);
+
+            document.getElementById('loadingMessage').style.display = 'none';
+
+            // Display raw JSON data
+            document.getElementById('rawDataDisplay').textContent = JSON.stringify(transactions, null, 2);
+            document.getElementById('rawDataCard').style.display = 'block';
+
+            if (!transactions || transactions.length === 0) {
+                document.getElementById('noTransactionsMessage').style.display = 'block';
+                return;
+            }
+
+            // Store transactions globally
+            allTransactions = transactions;
+
+            // Populate symbol filter dropdown
+            populateSymbolFilter(transactions);
+
+            // Display all transactions
+            displayTransactions(transactions, '');
+
+            // Show the filter card
+            document.getElementById('symbolFilterCard').style.display = 'block';
+
+        } catch (error) {
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('errorMessage').textContent = `Error: ${error.message}`;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+    });
+
+    function populateSymbolFilter(transactions) {
+        const symbolSet = new Set();
+
+        transactions.forEach(transaction => {
+            const equityItem = transaction.transferItems?.find(item =>
+                item.instrument?.assetType === 'EQUITY' ||
+                item.instrument?.assetType === 'OPTION' ||
+                item.instrument?.assetType === 'FUTURE' ||
+                item.instrument?.assetType === 'COLLECTIVE_INVESTMENT'
+            );
+            const symbol = equityItem?.instrument?.symbol || 'N/A';
+            if (symbol !== 'N/A') {
+                symbolSet.add(symbol);
+            }
+        });
+
+        // Sort symbols alphabetically
+        const symbols = Array.from(symbolSet).sort();
+
+        const dropdown = document.getElementById('symbolFilter');
+        dropdown.innerHTML = '<option value="">All Symbols</option>';
+
+        symbols.forEach(symbol => {
+            const option = document.createElement('option');
+            option.value = symbol;
+            option.textContent = symbol;
+            dropdown.appendChild(option);
+        });
+    }
+
+    function displayTransactions(transactions, filterSymbol) {
+        // Filter transactions if a symbol is selected
+        let filteredTransactions = transactions;
+        if (filterSymbol) {
+            filteredTransactions = transactions.filter(transaction => {
+                const equityItem = transaction.transferItems?.find(item =>
+                    item.instrument?.assetType === 'EQUITY' ||
+                    item.instrument?.assetType === 'OPTION' ||
+                    item.instrument?.assetType === 'FUTURE' ||
+                    item.instrument?.assetType === 'COLLECTIVE_INVESTMENT'
+                );
+                const symbol = equityItem?.instrument?.symbol || 'N/A';
+                return symbol === filterSymbol;
+            });
+        }
+
+        // Group transactions by orderId and symbol, summing amounts
+        const groupedTransactions = new Map();
+
+        filteredTransactions.forEach(transaction => {
+            // Find the equity transfer item (the actual stock/security being traded)
+            const equityItem = transaction.transferItems?.find(item =>
+                item.instrument?.assetType === 'EQUITY' ||
+                item.instrument?.assetType === 'OPTION' ||
+                item.instrument?.assetType === 'FUTURE' ||
+                item.instrument?.assetType === 'COLLECTIVE_INVESTMENT'
+            );
+
+            const symbol = equityItem?.instrument?.symbol || 'N/A';
+            const orderId = transaction.orderId || transaction.orderDetail?.orderId || 'NONE';
+            const groupKey = `${orderId}_${symbol}`;
+
+            if (groupedTransactions.has(groupKey)) {
+                // Add to existing group
+                const existing = groupedTransactions.get(groupKey);
+                existing.netAmount += (transaction.netAmount || 0);
+                existing.quantity += (equityItem?.amount || 0);
+                existing.transactions.push(transaction); // Store all transactions for this group
+            } else {
+                // Create new group
+                groupedTransactions.set(groupKey, {
+                    transactions: [transaction], // Store as array to capture all split transactions
+                    equityItem: equityItem,
+                    symbol: symbol,
+                    orderId: orderId,
+                    quantity: equityItem?.amount || 0,
+                    price: equityItem?.price || 0,
+                    netAmount: transaction.netAmount || 0,
+                    tradeDate: transaction.time || transaction.tradeDate,
+                    description: equityItem?.instrument?.description || transaction.type || 'N/A',
+                    type: transaction.type,
+                    status: transaction.status
+                });
+            }
+        });
+
+        // Group by symbol for totals
+        const symbolGroups = new Map();
+        groupedTransactions.forEach(group => {
+            if (!symbolGroups.has(group.symbol)) {
+                symbolGroups.set(group.symbol, []);
+            }
+            symbolGroups.get(group.symbol).push(group);
+        });
+
+        // Sort each symbol group by date (newest first)
+        symbolGroups.forEach((groups, symbol) => {
+            groups.sort((a, b) => new Date(b.tradeDate) - new Date(a.tradeDate));
+        });
+
+        // Sort symbol groups alphabetically by symbol name
+        const sortedSymbolGroups = new Map([...symbolGroups.entries()].sort((a, b) => a[0].localeCompare(b[0])));
+
+        // Populate table with grouped transactions and totals
+        const tbody = document.getElementById('transactionsTableBody');
+        tbody.innerHTML = '';
+
+        sortedSymbolGroups.forEach((groups, symbol) => {
+            let symbolTotalQuantity = 0;
+            let symbolTotalAmount = 0;
+
+            // Add all transaction rows for this symbol
+            groups.forEach((group, index) => {
+                const row = document.createElement('tr');
+                const rowId = `row-${symbol}-${index}`;
+                row.innerHTML = `
+                    <td>${formatDate(group.tradeDate)}</td>
+                    <td><span class="badge bg-${getTypeBadgeClass(group.type)}">${group.type}</span></td>
+                    <td><strong>${group.symbol}</strong></td>
+                    <td>${group.description}</td>
+                    <td>${group.quantity}</td>
+                    <td>${group.price > 0 ? group.price.toFixed(2) : 'N/A'}</td>
+                    <td></td>
+                    <td class="${group.netAmount >= 0 ? 'text-success' : 'text-danger'}">${formatCurrency(group.netAmount)}</td>
+                    <td><span class="badge bg-info">${group.status || 'N/A'}</span></td>
+                    <td><button class="btn btn-outline-secondary btn-sm view-json-btn" data-row-id="${rowId}">View</button></td>
+                `;
+                // Store the raw transaction data on the row (all transactions for this group)
+                row.dataset.transactionJson = JSON.stringify(group.transactions, null, 2);
+                row.id = rowId;
+                tbody.appendChild(row);
+
+                // Accumulate totals
+                symbolTotalQuantity += group.quantity;
+                symbolTotalAmount += group.netAmount;
+            });
+
+            // Add total row for this symbol
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'symbol-total-row';
+
+            // Calculate average cost per share if quantity is non-zero
+            let avgCostHtml = '<td></td>';
+            if (symbolTotalQuantity !== 0) {
+                const avgCost = Math.abs(symbolTotalAmount / symbolTotalQuantity);
+                avgCostHtml = `<td><strong class="text-primary">${avgCost.toFixed(2)}</strong></td>`;
+            }
+
+            totalRow.innerHTML = `
+                <td colspan="3"><strong>${symbol} TOTAL</strong></td>
+                <td></td>
+                <td><strong>${symbolTotalQuantity.toFixed(2)}</strong></td>
+                <td></td>
+                ${avgCostHtml}
+                <td class="${symbolTotalAmount >= 0 ? 'text-success' : 'text-danger'}"><strong>${formatCurrency(symbolTotalAmount)}</strong></td>
+                <td></td>
+                <td></td>
+            `;
+            tbody.appendChild(totalRow);
+
+            // Add spacing row if there are multiple symbols
+            if (sortedSymbolGroups.size > 1) {
+                const spacerRow = document.createElement('tr');
+                spacerRow.className = 'symbol-spacer-row';
+                spacerRow.innerHTML = '<td colspan="10"></td>';
+                tbody.appendChild(spacerRow);
+            }
+        });
+
+        document.getElementById('transactionCount').textContent = groupedTransactions.size;
+        document.getElementById('transactionsTableCard').style.display = 'block';
+    }
+
+    function getTypeBadgeClass(type) {
+        const tradeTypes = ['TRADE', 'BUY', 'SELL'];
+        const dividendTypes = ['DIVIDEND', 'DIVIDEND_OR_INTEREST'];
+        const feeTypes = ['FEE', 'COMMISSION'];
+
+        if (tradeTypes.some(t => type.includes(t))) return 'primary';
+        if (dividendTypes.some(t => type.includes(t))) return 'success';
+        if (feeTypes.some(t => type.includes(t))) return 'warning';
+        return 'secondary';
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleString();
+    }
+
+    function formatCurrency(amount) {
+        if (amount === null || amount === undefined) return 'N/A';
+        const formatted = Math.abs(amount).toFixed(2);
+        return amount >= 0 ? `+${formatted}` : `-${formatted}`;
+    }
+</script>
+
+<style>
+    .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .symbol-total-row {
+        background-color: rgba(108, 117, 125, 0.1) !important;
+        border-top: 2px solid #495057 !important;
+        border-bottom: 2px solid #495057 !important;
+        font-weight: bold;
+    }
+
+    .symbol-total-row td {
+        background-color: rgba(108, 117, 125, 0.1) !important;
+        padding: 12px 8px !important;
+        font-size: 1.05em;
+    }
+
+    .symbol-total-row:hover {
+        background-color: rgba(108, 117, 125, 0.2) !important;
+    }
+
+    .symbol-spacer-row {
+        height: 15px;
+        background-color: transparent !important;
+    }
+
+    .symbol-spacer-row td {
+        padding: 0 !important;
+        border: none !important;
+        background-color: transparent !important;
+    }
+
+    .symbol-spacer-row:hover {
+        background-color: transparent !important;
+    }
+</style>

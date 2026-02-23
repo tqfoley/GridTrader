@@ -1,0 +1,477 @@
+<div id="stockTickerContainer" class="stock-ticker-container">
+    <div class="ticker-row ticker-row-1">
+        <div class="stock-ticker stock-ticker-1">
+            <div class="ticker-item ticker-ratio" id="ticker-ratio-FBTC-MSTR">
+                <span class="ticker-symbol">FBTC/MSTR</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-TSLA">
+                <span class="ticker-symbol">TSLA</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-MSTR">
+                <span class="ticker-symbol">MSTR</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-BETA">
+                <span class="ticker-symbol">BETA</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-FBTC">
+                <span class="ticker-symbol">FBTC</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-HOOD">
+                <span class="ticker-symbol">HOOD</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-GBTC">
+                <span class="ticker-symbol">GBTC</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-NVDA">
+                <span class="ticker-symbol">NVDA</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-CLSK">
+                <span class="ticker-symbol">CLSK</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+        </div>
+    </div>
+    <div class="ticker-row ticker-row-2">
+        <div class="stock-ticker stock-ticker-2">
+            <div class="ticker-item" id="ticker-QBTS">
+                <span class="ticker-symbol">QBTS</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-SOFI">
+                <span class="ticker-symbol">SOFI</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-CRCL">
+                <span class="ticker-symbol">CRCL</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-COIN">
+                <span class="ticker-symbol">COIN</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-IBIT">
+                <span class="ticker-symbol">IBIT</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-AMD">
+                <span class="ticker-symbol">AMD</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+            <div class="ticker-item" id="ticker-MARA">
+                <span class="ticker-symbol">MARA</span>
+                <span class="ticker-price">--</span>
+                <span class="ticker-change">--</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Import LED-style font */
+    @@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+    .stock-ticker-container {
+        background: #000000;
+        color: #ff0000;
+        overflow: hidden;
+        padding: 0;
+        border-top: 2px solid #330000;
+        border-bottom: 2px solid #330000;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: 70px;
+        box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+        z-index: 9999;
+        font-family: 'Orbitron', monospace;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .ticker-row {
+        overflow: hidden;
+        height: 35px;
+        position: relative;
+    }
+
+    .stock-ticker {
+        display: inline-flex;
+        white-space: nowrap;
+        height: 100%;
+        align-items: center;
+        position: absolute;
+        left: 0;
+    }
+
+    .stock-ticker-1 {
+        animation: scroll-left-1 35s linear infinite;
+    }
+
+    .stock-ticker-2 {
+        animation: scroll-left-2 30s linear infinite;
+    }
+
+    @@keyframes scroll-left-1 {
+        0% {
+            transform: translateX(0%);
+        }
+        100% {
+            transform: translateX(-33.33%);
+        }
+    }
+
+    @@keyframes scroll-left-2 {
+        0% {
+            transform: translateX(-15%);
+        }
+        100% {
+            transform: translateX(-48.33%);
+        }
+    }
+
+    .stock-ticker:hover {
+        animation-play-state: paused;
+    }
+
+    .ticker-item {
+        display: inline-flex;
+        align-items: center;
+        margin: 0 40px;
+        font-weight: 900;
+        min-width: 240px;
+        height: 100%;
+        text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 30px #ff0000;
+        letter-spacing: 2px;
+    }
+
+    .ticker-symbol {
+        font-size: 18px;
+        font-weight: 900;
+        margin-right: 15px;
+        color: #ff0000;
+        text-transform: uppercase;
+    }
+
+    .ticker-price {
+        font-size: 18px;
+        margin-right: 12px;
+        color: #ff0000;
+        font-weight: 900;
+    }
+
+    .ticker-change {
+        font-size: 16px;
+        font-weight: 900;
+        color: #ff0000;
+    }
+
+    .ticker-change.positive::before {
+        content: '▲ ';
+    }
+
+    .ticker-change.negative::before {
+        content: '▼ ';
+    }
+
+    .ticker-change.neutral::before {
+        content: '■ ';
+    }
+
+    /* Ratio ticker styling - cyan/blue color to distinguish from regular tickers */
+    .ticker-item.ticker-ratio {
+        text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
+    }
+
+    .ticker-item.ticker-ratio .ticker-symbol {
+        color: #00ffff;
+    }
+
+    .ticker-item.ticker-ratio .ticker-price {
+        color: #00ffff;
+    }
+
+    .ticker-item.ticker-ratio .ticker-change {
+        color: #00ffff;
+    }
+
+    /* Positive change styling - green for regular tickers */
+    .ticker-item:not(.ticker-ratio).ticker-positive {
+        text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00, 0 0 30px #00ff00;
+    }
+
+    .ticker-item:not(.ticker-ratio).ticker-positive .ticker-symbol,
+    .ticker-item:not(.ticker-ratio).ticker-positive .ticker-price,
+    .ticker-item:not(.ticker-ratio).ticker-positive .ticker-change {
+        color: #00ff00;
+    }
+
+    /* Negative change styling - red for regular tickers (default) */
+    .ticker-item:not(.ticker-ratio).ticker-negative {
+        text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 30px #ff0000;
+    }
+
+    .ticker-item:not(.ticker-ratio).ticker-negative .ticker-symbol,
+    .ticker-item:not(.ticker-ratio).ticker-negative .ticker-price,
+    .ticker-item:not(.ticker-ratio).ticker-negative .ticker-change {
+        color: #ff0000;
+    }
+
+    /* Loading animation with LED flicker effect */
+    @@keyframes led-pulse {
+        0%, 100% {
+            opacity: 1;
+            text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 30px #ff0000;
+        }
+        50% {
+            opacity: 0.6;
+            text-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000, 0 0 15px #ff0000;
+        }
+    }
+
+    .ticker-item.loading .ticker-price,
+    .ticker-item.loading .ticker-change {
+        animation: led-pulse 1s ease-in-out infinite;
+    }
+
+    /* Add padding to body to account for fixed ticker */
+    body {
+        padding-top: 70px;
+    }
+
+    /* Mobile responsive */
+    @@media (max-width: 768px) {
+        .stock-ticker-container {
+            height: 56px;
+        }
+
+        .ticker-row {
+            height: 28px;
+        }
+
+        body {
+            padding-top: 56px;
+        }
+
+        .ticker-symbol {
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        .ticker-price {
+            font-size: 14px;
+            margin-right: 8px;
+        }
+
+        .ticker-change {
+            font-size: 12px;
+        }
+
+        .ticker-item {
+            margin: 0 25px;
+            min-width: 180px;
+        }
+    }
+</style>
+
+<script>
+    (function() {
+        const symbols = ['TSLA', 'QBTS', 'MSTR', 'SOFI', 'BETA', 'CRCL', 'FBTC', 'COIN', 'HOOD', 'IBIT', 'GBTC', 'AMD', 'NVDA', 'MARA', 'CLSK'];
+        // Ratios: numerator/denominator pairs
+        const ratios = [
+            { numerator: 'FBTC', denominator: 'MSTR', id: 'FBTC-MSTR' }
+        ];
+        let updateInterval;
+        // Store prices for ratio calculations
+        const priceCache = {};
+
+        // Function to update ratio displays
+        function updateRatios() {
+            for (const ratio of ratios) {
+                const numPrice = priceCache[ratio.numerator];
+                const denomPrice = priceCache[ratio.denominator];
+
+                if (numPrice && denomPrice && denomPrice.close > 0) {
+                    const ratioValue = numPrice.close / denomPrice.close;
+
+                    // Calculate ratio change based on previous day's ratio
+                    const prevNumClose = numPrice.close - (numPrice.change || 0);
+                    const prevDenomClose = denomPrice.close - (denomPrice.change || 0);
+                    const prevRatio = prevDenomClose > 0 ? prevNumClose / prevDenomClose : 0;
+                    const ratioChange = prevRatio > 0 ? ((ratioValue - prevRatio) / prevRatio) * 100 : 0;
+
+                    // Update all instances of this ratio ticker
+                    const ratioItems = document.querySelectorAll(`#ticker-ratio-${ratio.id}`);
+                    ratioItems.forEach(ratioItem => {
+                        const priceElement = ratioItem.querySelector('.ticker-price');
+                        const changeElement = ratioItem.querySelector('.ticker-change');
+
+                        priceElement.textContent = ratioValue.toFixed(4);
+
+                        const changeText = (ratioChange >= 0 ? '+' : '') + ratioChange.toFixed(2) + '%';
+                        changeElement.textContent = changeText;
+
+                        // Update color class
+                        changeElement.classList.remove('positive', 'negative', 'neutral');
+                        if (ratioChange > 0) {
+                            changeElement.classList.add('positive');
+                        } else if (ratioChange < 0) {
+                            changeElement.classList.add('negative');
+                        } else {
+                            changeElement.classList.add('neutral');
+                        }
+
+                        ratioItem.classList.remove('loading');
+                    });
+
+                    console.log(`Ratio ${ratio.numerator}/${ratio.denominator}: ${ratioValue.toFixed(4)} (${ratioChange.toFixed(2)}%)`);
+                }
+            }
+        }
+
+        // Function to update stock prices using free API
+        async function updateStockPrices() {
+            console.log('Stock Ticker: Updating prices for symbols:', symbols);
+
+            // Add loading class to ratio items
+            for (const ratio of ratios) {
+                const ratioItems = document.querySelectorAll(`#ticker-ratio-${ratio.id}`);
+                ratioItems.forEach(item => item.classList.add('loading'));
+            }
+
+            for (const symbol of symbols) {
+                // Add loading class
+                const tickerItems = document.querySelectorAll(`#ticker-${symbol}`);
+                tickerItems.forEach(item => item.classList.add('loading'));
+
+                try {
+                    // Use server-side proxy to avoid CORS issues
+                    const response = await fetch(`/Schwab/GetStockQuote?symbol=${encodeURIComponent(symbol)}`);
+
+                    if (response.ok) {
+                        const data = await response.json();
+
+                        // Log raw response for debugging
+                        console.log(`Raw API response for ${symbol}:`, data);
+
+                        const quote = data;
+
+                        console.log(`Parsed quote for ${symbol}:`, quote);
+
+                        if (quote && quote.close) {
+                            const price = quote.close || 0;
+                            const change = quote.change || 0;
+                            const changePercent = quote.change_p || 0;
+
+                            // Store in cache for ratio calculations
+                            priceCache[symbol] = { close: price, change: change, change_p: changePercent };
+
+                            console.log(`${symbol} - Price: ${price}, Change: ${change}, Change%: ${changePercent}`);
+
+                            // Update the ticker display - update all instances
+                            const tickerItems = document.querySelectorAll(`#ticker-${symbol}`);
+                            tickerItems.forEach(tickerItem => {
+                                const priceElement = tickerItem.querySelector('.ticker-price');
+                                const changeElement = tickerItem.querySelector('.ticker-change');
+
+                                priceElement.textContent = price.toFixed(2);
+
+                                const changeText = (change >= 0 ? '+' : '') + change.toFixed(2) + ' (' + (changePercent >= 0 ? '+' : '') + changePercent.toFixed(2) + '%)';
+                                changeElement.textContent = changeText;
+
+                                // Update color class on change element
+                                changeElement.classList.remove('positive', 'negative', 'neutral');
+                                if (change > 0) {
+                                    changeElement.classList.add('positive');
+                                } else if (change < 0) {
+                                    changeElement.classList.add('negative');
+                                } else {
+                                    changeElement.classList.add('neutral');
+                                }
+
+                                // Update ticker item color class (green for positive, red for negative)
+                                tickerItem.classList.remove('ticker-positive', 'ticker-negative');
+                                if (changePercent > 0) {
+                                    tickerItem.classList.add('ticker-positive');
+                                } else {
+                                    tickerItem.classList.add('ticker-negative');
+                                }
+
+                                // Remove loading class
+                                tickerItem.classList.remove('loading');
+                            });
+                        } else {
+                            console.warn(`No quote data found for ${symbol}`);
+                        }
+                    } else {
+                        const errorText = await response.text();
+                        console.error(`API error for ${symbol}: ${response.status} - ${errorText}`);
+                    }
+                } catch (error) {
+                    console.error(`Error fetching ${symbol}:`, error);
+                } finally {
+                    // Remove loading class on error too
+                    const tickerItems = document.querySelectorAll(`#ticker-${symbol}`);
+                    tickerItems.forEach(item => item.classList.remove('loading'));
+                }
+            }
+
+            // Update ratios after all prices are fetched
+            updateRatios();
+        }
+
+        // Initialize ticker on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Duplicate ticker items for seamless scrolling - do for each row
+            const tickers = document.querySelectorAll('.stock-ticker');
+            tickers.forEach(ticker => {
+                const items = ticker.innerHTML;
+                ticker.innerHTML = items + items + items; // Triple for smooth scrolling
+            });
+
+            // Update prices immediately
+            updateStockPrices();
+
+            // Update prices every 5 minutes (300000 milliseconds)
+            updateInterval = setInterval(updateStockPrices, 300000);
+
+            // Also update when password is set
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'apiPassword' && e.newValue) {
+                    updateStockPrices();
+                }
+            });
+        });
+
+        // Clean up interval on page unload
+        window.addEventListener('beforeunload', function() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
+    })();
+</script>

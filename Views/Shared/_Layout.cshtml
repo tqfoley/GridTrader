@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Schwab OAuth App</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/Images/TFicon.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/Images/TFicon.png" />
+    <link rel="shortcut icon" type="image/png" href="/Images/TFicon.png" />
+    <link rel="apple-touch-icon" href="/Images/TFicon.png" />
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Ensure navbar is positioned below the fixed LED ticker */
+        header {
+            position: relative;
+            z-index: 9998;
+        }
+
+        /* Buying power warning backgrounds */
+        body.buying-power-warning {
+            background-color: rgba(255, 165, 0, 0.15) !important;
+        }
+
+        body.buying-power-danger {
+            background-color: rgba(255, 0, 0, 0.4) !important;
+        }
+
+        body.buying-power-warning .container,
+        body.buying-power-danger .container {
+            background-color: transparent;
+        }
+
+        /* Buying power banner styles */
+        #buyingPowerBanner {
+            background-color: #e9ecef;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 1.1em;
+        }
+
+        #buyingPowerBanner.bp-warning {
+            background-color: rgba(255, 165, 0, 0.4);
+            color: #000;
+        }
+
+        #buyingPowerBanner.bp-danger {
+            background-color: rgba(255, 0, 0, 0.6);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    @Html.Partial("_StockTicker")
+
+    <header>
+        <nav class="navbar navbar-expand-sm navbar-dark bg-dark">
+            <div class="container">
+                <a class="navbar-brand" href="/">TQFoley Schwab API App</a>
+            </div>
+        </nav>
+    </header>
+
+    <div id="buyingPowerBanner" class="text-center py-2" style="display: none;">
+        <strong>Buying Power: <span id="buyingPowerDisplay">--</span></strong>
+    </div>
+
+    <div class="container">
+        <main role="main" class="pb-3">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="border-top footer text-muted">
+        <div class="container text-center py-3">
+            &copy; 2025 - TQFoley Schwab API App
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "Kestrel": {
+    "Endpoints": {
+      "Http": {
+        "Url": "http://0.0.0.0:5000"
+      }
+    }
+  },
+  "Schwab": {
+    "ClientId": "YOUR_SCHWAB_APP_KEY",
+    "ClientSecret": "YOUR_SCHWAB_SECRET",
+    "RedirectUri": "YOUR_HTTPS_URL",
+    "ApiPassword": ""
+    "TokenFilePath": "schwabtokens.json"
+  },
+  "Totp": {
+    "SecretFilePath": "totpsecret.txt",
+    "Issuer": "GridTraderApp"
+  },
+  "EODHD": {
+    "ApiToken": "API_TOKEN"
+  }
+}

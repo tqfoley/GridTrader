@@ -1,0 +1,179 @@
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Account Information</h5>
+        <button id="refreshTokenBtn" class="btn btn-warning btn-sm">Refresh Token</button>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <label for="accountHash" class="form-label">Account Hash 1</label>
+                <input type="text" class="form-control account-input" id="accountHash" name="accountHash" value="560EBE7D6FF05F00757F0DB50C9A37C83454E085FBB999F6DFB6D7CAE6230BCA" required>
+                <small class="form-text text-muted">Primary account hash</small>
+            </div>
+            <div class="col-md-4">
+                <label for="accountHash2" class="form-label">Account Hash 2 <span class="badge bg-secondary">Optional</span></label>
+                <input type="text" class="form-control account-input" id="accountHash2" name="accountHash2">
+                <small class="form-text text-muted">Secondary account hash (leave empty to skip)</small>
+            </div>
+            <div class="col-md-4">
+                <label for="password" class="form-label">API Password</label>
+                <input type="text" class="form-control account-input" id="password" name="password" required>
+                <small class="form-text text-muted">Enter your API password</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Load saved values from sessionStorage on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        const savedPassword = sessionStorage.getItem('apiPassword');
+        const savedAccountHash = sessionStorage.getItem('accountHash');
+        const savedAccountHash2 = sessionStorage.getItem('accountHash2');
+
+        if (savedPassword) {
+            document.getElementById('password').value = savedPassword;
+        }
+        if (savedAccountHash) {
+            document.getElementById('accountHash').value = savedAccountHash;
+        } else {
+            // Set default account hash in sessionStorage if not already set
+            sessionStorage.setItem('accountHash', '560EBE7D6FF05F00757F0DB50C9A37C83454E085FBB999F6DFB6D7CAE6230BCA');
+        }
+        if (savedAccountHash2) {
+            document.getElementById('accountHash2').value = savedAccountHash2;
+        }
+    });
+
+    // Save values to sessionStorage when they change
+    document.getElementById('password')?.addEventListener('input', function() {
+        sessionStorage.setItem('apiPassword', this.value);
+    });
+
+    document.getElementById('accountHash')?.addEventListener('input', function() {
+        sessionStorage.setItem('accountHash', this.value);
+    });
+
+    document.getElementById('accountHash2')?.addEventListener('input', function() {
+        sessionStorage.setItem('accountHash2', this.value);
+    });
+
+    // Refresh Token button handler
+    document.getElementById('refreshTokenBtn')?.addEventListener('click', async function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Refreshing...';
+        try {
+            const response = await fetch('/Schwab/RefreshToken', {
+                method: 'POST'
+            });
+            const data = await response.text();
+            if (!response.ok) {
+                alert('Error refreshing token: ' + data);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Refresh Token';
+        }
+    });
+
+    // Helper function to get account hashes as array
+    function getAccountHashes() {
+        const hashes = [];
+        const hash1 = document.getElementById('accountHash')?.value;
+        const hash2 = document.getElementById('accountHash2')?.value;
+        if (hash1) hashes.push(hash1);
+        if (hash2) hashes.push(hash2);
+        return hashes;
+    }
+
+    // Helper function to fetch data for all accounts and combine results
+    async function fetchForAllAccounts(urlTemplate, password) {
+        const hashes = getAccountHashes();
+        const results = [];
+
+        for (const hash of hashes) {
+            const url = urlTemplate.replace('{accountHash}', encodeURIComponent(hash));
+            const fullUrl = url + (url.includes('?') ? '&' : '?') + 'password=' + encodeURIComponent(password);
+            const response = await fetch(fullUrl);
+            if (response.ok) {
+                const data = await response.json();
+                if (Array.isArray(data)) {
+                    results.push(...data);
+                } else {
+                    results.push(data);
+                }
+            }
+        }
+        return results;
+    }
+
+    // Function to check buying power and apply background color
+    async function checkBuyingPowerBackground() {
+        const password = sessionStorage.getItem('apiPassword');
+        const accountHash = sessionStorage.getItem('accountHash');
+
+        if (!password || !accountHash) return;
+
+        try {
+            const response = await fetch(`/Schwab/GetAccountDetails?accountHash=${encodeURIComponent(accountHash)}&password=${encodeURIComponent(password)}`);
+            if (response.ok) {
+                const data = await response.json();
+                const buyingPower = data.securitiesAccount?.currentBalances?.buyingPowerNonMarginableTrade || 0;
+
+                // Store in sessionStorage for other pages
+                sessionStorage.setItem('buyingPower', buyingPower.toString());
+
+                // Apply background color
+                applyBuyingPowerBackground(buyingPower);
+            }
+        } catch (error) {
+            console.error('Error checking buying power:', error);
+        }
+    }
+
+    // Function to apply background based on buying power value
+    function applyBuyingPowerBackground(buyingPower) {
+        const body = document.body;
+        body.classList.remove('buying-power-warning', 'buying-power-danger');
+
+        // Update banner display
+        const banner = document.getElementById('buyingPowerBanner');
+        const display = document.getElementById('buyingPowerDisplay');
+
+        if (banner && display) {
+            display.textContent = buyingPower.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            banner.style.display = 'block';
+            banner.classList.remove('bp-warning', 'bp-danger');
+
+            if (buyingPower < 10000) {
+                banner.classList.add('bp-danger');
+            } else if (buyingPower < 25000) {
+                banner.classList.add('bp-warning');
+            }
+        }
+
+        if (buyingPower < 10000) {
+            body.classList.add('buying-power-danger');
+        } else if (buyingPower < 25000) {
+            body.classList.add('buying-power-warning');
+        }
+    }
+
+    // Check buying power on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        // First check if we have a cached value
+        const cachedBuyingPower = sessionStorage.getItem('buyingPower');
+        if (cachedBuyingPower) {
+            applyBuyingPowerBackground(parseFloat(cachedBuyingPower));
+        }
+
+        // Then fetch fresh data if credentials are available
+        const password = sessionStorage.getItem('apiPassword');
+        if (password) {
+            checkBuyingPowerBackground();
+        }
+    });
+</script>

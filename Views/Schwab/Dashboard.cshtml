@@ -1,0 +1,381 @@
+@{
+    ViewData["Title"] = "Schwab Dashboard";
+    ViewData["PageTitle"] = "Schwab Dashboard";
+}
+
+<div class="container mt-5">
+    <div class="text-center mb-4">
+        <img src="/Images/SchwabDashboard.png" alt="Schwab Dashboard" class="img-fluid" style="max-width: 600px;" />
+    </div>
+
+    @Html.Partial("_DashboardNav")
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (ViewBag.HasToken)
+    {
+        <div class="alert alert-success">
+            Successfully connected to Schwab!
+        </div>
+
+        <div class="card mt-4" id="accountBalanceCard" style="display: none;">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Account Balance Summary</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <h6 class="text-muted">Equity</h6>
+                            <h3 class="text-primary" id="equityValue">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <h6 class="text-muted">Buying Power (Non-Marginable)</h6>
+                            <h3 class="text-success" id="buyingPowerValue">-</h3>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3 border rounded">
+                            <h6 class="text-muted">Short Margin Value</h6>
+                            <h3 class="text-danger" id="shortMarginValue">-</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3 text-center">
+                    <button id="refreshBalances" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Balances
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @if (ViewBag.FailedAttempts != null && ((List<string>)ViewBag.FailedAttempts).Count > 0)
+        {
+            <div class="alert alert-danger mt-4">
+                <h5>Failed Password Attempts:</h5>
+                <ul>
+                    @foreach (var attempt in (List<string>)ViewBag.FailedAttempts)
+                    {
+                        <li>@attempt</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        <div class="mt-4">
+            <h4>Token Management</h4>
+            <button id="refreshToken" class="btn btn-warning">Refresh Token</button>
+            <form asp-action="Disconnect" method="post" style="display:inline;">
+                <button type="submit" class="btn btn-danger">Disconnect</button>
+            </form>
+        </div>
+
+        <div class="mt-4">
+            <h4>API Actions</h4>
+            <div class="mb-3">
+                <label for="apiPassword" class="form-label">API Password:</label>
+                <input type="text" id="apiPassword" class="form-control" placeholder="Enter API password (if set in appsettings.json)">
+                <small class="text-muted">Password is configured in appsettings.json</small>
+            </div>
+            <div class="mb-3">
+                <button id="getAccountNumbers" class="btn btn-primary">Get Account Numbers</button>
+            </div>
+            <div class="mb-3">
+                <label for="accountHash" class="form-label">Account Hash:</label>
+                <div class="input-group">
+                    <input type="text" id="accountHash" class="form-control" placeholder="Enter account hash">
+                    <button id="getAccountDetails" class="btn btn-primary">Get Account Details</button>
+                </div>
+                <small class="text-muted">First get account numbers to find your account hash</small>
+            </div>
+            <div class="mb-3">
+                <label for="symbol" class="form-label">Stock Symbol:</label>
+                <div class="input-group">
+                    <input type="text" id="symbol" class="form-control" placeholder="e.g., AAPL, TSLA, SPY" value="AAPL">
+                    <button id="getQuote" class="btn btn-primary">Get Quote</button>
+                </div>
+                <small class="text-muted">Uses EODHD API for real-time stock data</small>
+            </div>
+            <div class="mb-3">
+                <label for="priceHistorySymbol" class="form-label">Price History:</label>
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <input type="text" id="priceHistorySymbol" class="form-control" placeholder="Symbol" value="AAPL">
+                    </div>
+                    <div class="col-md-2">
+                        <select id="periodType" class="form-select">
+                            <option value="day">Day</option>
+                            <option value="month" selected>Month</option>
+                            <option value="year">Year</option>
+                            <option value="ytd">YTD</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" id="period" class="form-control" placeholder="Period" value="1" min="1">
+                    </div>
+                    <div class="col-md-2">
+                        <select id="frequencyType" class="form-select">
+                            <option value="minute">Minute</option>
+                            <option value="daily" selected>Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button id="getPriceHistory" class="btn btn-primary w-100">Get Price History</button>
+                    </div>
+                </div>
+                <small class="text-muted">Uses EODHD API for historical price data</small>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h4>API Response</h4>
+            <pre id="apiResponse" class="border p-3 bg-light" style="max-height: 500px; overflow-y: auto;">
+No data loaded yet. Click one of the API action buttons above.
+            </pre>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            Not connected to Schwab. Please <a asp-action="Login">login</a>.
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        const apiResponseElement = document.getElementById('apiResponse');
+
+        // Load saved values from sessionStorage on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            const savedPassword = sessionStorage.getItem('apiPassword');
+            const savedAccountHash = sessionStorage.getItem('accountHash');
+
+            if (savedPassword) {
+                document.getElementById('apiPassword').value = savedPassword;
+            }
+            if (savedAccountHash) {
+                document.getElementById('accountHash').value = savedAccountHash;
+            }
+
+            // Auto-load account balances if both values are present
+            if (savedPassword && savedAccountHash) {
+                loadAccountBalances(savedAccountHash, savedPassword);
+            }
+        });
+
+        // Function to load and display account balances
+        async function loadAccountBalances(accountHash, password) {
+            try {
+                const response = await fetch('@Url.Action("GetAccountDetails", "Schwab")?accountHash=' + encodeURIComponent(accountHash) + '&password=' + encodeURIComponent(password));
+
+                if (response.ok) {
+                    const data = await response.json();
+
+                    // Extract values from currentBalances
+                    const currentBalances = data.securitiesAccount?.currentBalances;
+
+                    if (currentBalances) {
+                        // Update the display
+                        document.getElementById('equityValue').textContent = (currentBalances.equity || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        document.getElementById('buyingPowerValue').textContent = (currentBalances.buyingPowerNonMarginableTrade || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        document.getElementById('shortMarginValue').textContent = (currentBalances.shortMarginValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                        // Save buying power and apply background color
+                        const buyingPower = currentBalances.buyingPowerNonMarginableTrade || 0;
+                        sessionStorage.setItem('buyingPower', buyingPower.toString());
+                        if (typeof applyBuyingPowerBackground === 'function') {
+                            applyBuyingPowerBackground(buyingPower);
+                        }
+
+                        // Show the balance card
+                        document.getElementById('accountBalanceCard').style.display = 'block';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading account balances:', error);
+            }
+        }
+
+        // Refresh Balances button
+        document.getElementById('refreshBalances')?.addEventListener('click', function() {
+            const password = document.getElementById('apiPassword').value;
+            const accountHash = document.getElementById('accountHash').value;
+
+            if (password && accountHash) {
+                loadAccountBalances(accountHash, password);
+            } else {
+                alert('Please enter both API password and account hash first.');
+            }
+        });
+
+        // Save values to sessionStorage when they change
+        document.getElementById('apiPassword')?.addEventListener('input', function() {
+            sessionStorage.setItem('apiPassword', this.value);
+        });
+
+        document.getElementById('accountHash')?.addEventListener('input', function() {
+            sessionStorage.setItem('accountHash', this.value);
+        });
+
+        // Helper function to display API response
+        function displayResponse(data, isError = false) {
+            try {
+                const jsonData = typeof data === 'string' ? JSON.parse(data) : data;
+                apiResponseElement.textContent = JSON.stringify(jsonData, null, 2);
+                apiResponseElement.style.backgroundColor = isError ? '#f8d7da' : '#d1ecf1';
+            } catch {
+                apiResponseElement.textContent = data;
+                apiResponseElement.style.backgroundColor = isError ? '#f8d7da' : '#d1ecf1';
+            }
+        }
+
+        // Refresh Token
+        document.getElementById('refreshToken')?.addEventListener('click', async function() {
+            try {
+                const response = await fetch('@Url.Action("RefreshToken", "Schwab")', {
+                    method: 'POST'
+                });
+                const data = await response.text();
+                if (!response.ok) {
+                    alert('Error: ' + data);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        // Get Account Numbers
+        document.getElementById('getAccountNumbers')?.addEventListener('click', async function() {
+            const password = document.getElementById('apiPassword').value;
+            apiResponseElement.textContent = 'Loading account numbers...';
+            try {
+                const response = await fetch('@Url.Action("GetAccountNumbers", "Schwab")?password=' + encodeURIComponent(password));
+                const data = await response.text();
+                if (response.ok) {
+                    displayResponse(data);
+                } else {
+                    displayResponse(`Error ${response.status}: ${data}`, true);
+                    if (response.status === 401) {
+                        alert('Invalid password. Please check the password and try again.');
+                        location.reload(); // Reload to show failed attempts
+                    }
+                }
+            } catch (error) {
+                displayResponse('Error: ' + error.message, true);
+            }
+        });
+
+        // Get Account Details
+        document.getElementById('getAccountDetails')?.addEventListener('click', async function() {
+            const accountHash = document.getElementById('accountHash').value;
+            const password = document.getElementById('apiPassword').value;
+            if (!accountHash) {
+                alert('Please enter an account hash');
+                return;
+            }
+
+            apiResponseElement.textContent = 'Loading account details...';
+            try {
+                const response = await fetch('@Url.Action("GetAccountDetails", "Schwab")?accountHash=' + encodeURIComponent(accountHash) + '&password=' + encodeURIComponent(password));
+                const data = await response.text();
+                if (response.ok) {
+                    displayResponse(data);
+
+                    // Also update the balance card
+                    loadAccountBalances(accountHash, password);
+                } else {
+                    displayResponse(`Error ${response.status}: ${data}`, true);
+                    if (response.status === 401) {
+                        alert('Invalid password. Please check the password and try again.');
+                        location.reload(); // Reload to show failed attempts
+                    }
+                }
+            } catch (error) {
+                displayResponse('Error: ' + error.message, true);
+            }
+        });
+
+        // Get Quote - Using EODHD API
+        document.getElementById('getQuote')?.addEventListener('click', async function() {
+            const symbol = document.getElementById('symbol').value;
+            if (!symbol) {
+                alert('Please enter a stock symbol');
+                return;
+            }
+
+            apiResponseElement.textContent = 'Loading quote for ' + symbol + '...';
+            try {
+                // Use server-side proxy to avoid CORS issues
+                const response = await fetch(`/Schwab/GetStockQuote?symbol=${encodeURIComponent(symbol)}`);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResponse(data);
+                } else {
+                    const errorText = await response.text();
+                    displayResponse(`Error ${response.status}: ${errorText}`, true);
+                }
+            } catch (error) {
+                displayResponse('Error: ' + error.message, true);
+            }
+        });
+
+        // Get Price History - Using EODHD API
+        document.getElementById('getPriceHistory')?.addEventListener('click', async function() {
+            const symbol = document.getElementById('priceHistorySymbol').value;
+            const periodType = document.getElementById('periodType').value;
+            const period = document.getElementById('period').value;
+
+            if (!symbol) {
+                alert('Please enter a stock symbol');
+                return;
+            }
+
+            apiResponseElement.textContent = 'Loading price history for ' + symbol + '...';
+            try {
+                // Calculate date range based on period
+                const toDate = new Date();
+                const fromDate = new Date();
+
+                if (periodType === 'day') {
+                    fromDate.setDate(toDate.getDate() - (period * 1));
+                } else if (periodType === 'month') {
+                    fromDate.setMonth(toDate.getMonth() - (period * 1));
+                } else if (periodType === 'year') {
+                    fromDate.setFullYear(toDate.getFullYear() - (period * 1));
+                } else if (periodType === 'ytd') {
+                    fromDate.setMonth(0);
+                    fromDate.setDate(1);
+                }
+
+                const fromStr = fromDate.toISOString().split('T')[0];
+                const toStr = toDate.toISOString().split('T')[0];
+
+                // Use server-side proxy to avoid CORS issues
+                const endpoint = `/Schwab/GetStockHistory?symbol=${encodeURIComponent(symbol)}&from=${fromStr}&to=${toStr}`;
+
+                const response = await fetch(endpoint);
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResponse(data);
+                } else {
+                    const errorText = await response.text();
+                    displayResponse(`Error ${response.status}: ${errorText}`, true);
+                }
+            } catch (error) {
+                displayResponse('Error: ' + error.message, true);
+            }
+        });
+    </script>
+}

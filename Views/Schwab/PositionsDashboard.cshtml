@@ -1,0 +1,344 @@
+@{
+    ViewData["Title"] = "Positions Dashboard";
+    ViewData["PageTitle"] = "Positions Dashboard";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            @Html.Partial("_DashboardNav")
+
+            @Html.Partial("_AccountInputs")
+
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Load Positions</h5>
+                </div>
+                <div class="card-body">
+                    <form id="positionsForm">
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Load Account Positions</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+            <div id="loadingMessage" class="alert alert-info" style="display: none;">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Loading positions...
+            </div>
+
+            <div class="card mb-4" id="summaryCard" style="display: none;">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Account Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h4 id="totalPositions" class="text-primary">0</h4>
+                            <small class="text-muted">Total Positions</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 id="longPositions" class="text-success">0</h4>
+                            <small class="text-muted">Long Positions</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 id="shortPositions" class="text-danger">0</h4>
+                            <small class="text-muted">Short Positions</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 id="totalMarketValue" class="text-dark">0.00</h4>
+                            <small class="text-muted">Total Market Value</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="positionsTableCard" style="display: none;">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Equity Positions (<span id="positionCount">0</span>)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Quantity</th>
+                                    <th>Avg Price</th>
+                                    <th>Current Price</th>
+                                    <th>Market Value</th>
+                                    <th>Day P/L</th>
+                                    <th>Total P/L</th>
+                                    <th>P/L %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="positionsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="noPositionsMessage" class="alert alert-info" style="display: none;">
+                No equity positions found in this account.
+            </div>
+
+            <div class="card mt-4" id="rawDataCard" style="display: none;">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Raw API Response</h5>
+                    <button type="button" id="copyJsonBtn" class="btn btn-outline-light btn-sm">Copy JSON</button>
+                </div>
+                <div class="card-body">
+                    <pre id="rawDataDisplay" class="bg-light p-3" style="max-height: 400px; overflow-y: auto;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Copy JSON button handler
+    document.getElementById('copyJsonBtn')?.addEventListener('click', async function() {
+        const jsonText = document.getElementById('rawDataDisplay').textContent;
+        try {
+            await navigator.clipboard.writeText(jsonText);
+            this.textContent = 'Copied!';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        } catch (err) {
+            this.textContent = 'Failed';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        }
+    });
+
+    // Auto-load if both fields are populated
+    window.addEventListener('DOMContentLoaded', function() {
+        const savedPassword = sessionStorage.getItem('apiPassword');
+        const savedAccountHash = sessionStorage.getItem('accountHash');
+
+        if (savedPassword && savedAccountHash) {
+            document.getElementById('positionsForm').dispatchEvent(new Event('submit'));
+        }
+    });
+
+    document.getElementById('positionsForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const accountHash = document.getElementById('accountHash').value;
+        const accountHash2 = document.getElementById('accountHash2').value;
+        const password = document.getElementById('password').value;
+
+        // Hide previous results
+        document.getElementById('errorMessage').style.display = 'none';
+        document.getElementById('summaryCard').style.display = 'none';
+        document.getElementById('positionsTableCard').style.display = 'none';
+        document.getElementById('noPositionsMessage').style.display = 'none';
+        document.getElementById('loadingMessage').style.display = 'block';
+
+        try {
+            // Fetch from first account
+            let allData = [];
+            let positions = [];
+
+            const response1 = await fetch(`/Schwab/GetAccountDetails?accountHash=${encodeURIComponent(accountHash)}&password=${encodeURIComponent(password)}`);
+
+            if (response1.ok) {
+                const data1 = await response1.json();
+                allData.push(data1);
+                const pos1 = data1.securitiesAccount?.positions || [];
+                positions.push(...pos1);
+            }
+
+            // Fetch from second account if populated
+            if (accountHash2) {
+                const response2 = await fetch(`/Schwab/GetAccountDetails?accountHash=${encodeURIComponent(accountHash2)}&password=${encodeURIComponent(password)}`);
+                if (response2.ok) {
+                    const data2 = await response2.json();
+                    allData.push(data2);
+                    const pos2 = data2.securitiesAccount?.positions || [];
+                    positions.push(...pos2);
+                }
+            }
+
+            document.getElementById('loadingMessage').style.display = 'none';
+
+            // Display raw JSON data
+            document.getElementById('rawDataDisplay').textContent = JSON.stringify(allData, null, 2);
+            document.getElementById('rawDataCard').style.display = 'block';
+
+            // Filter for equity positions only
+            const equityPositions = positions.filter(pos =>
+                pos.instrument?.assetType === 'EQUITY' ||
+                pos.instrument?.assetType === 'COLLECTIVE_INVESTMENT'
+            );
+
+            if (equityPositions.length === 0) {
+                document.getElementById('noPositionsMessage').style.display = 'block';
+                return;
+            }
+
+            // Calculate summary stats
+            let longCount = 0;
+            let shortCount = 0;
+            let totalMarketValue = 0;
+
+            equityPositions.forEach(pos => {
+                if (pos.longQuantity > 0) longCount++;
+                if (pos.shortQuantity > 0) shortCount++;
+                totalMarketValue += pos.marketValue || 0;
+            });
+
+            document.getElementById('totalPositions').textContent = equityPositions.length;
+            document.getElementById('longPositions').textContent = longCount;
+            document.getElementById('shortPositions').textContent = shortCount;
+            document.getElementById('totalMarketValue').textContent = formatCurrency(totalMarketValue);
+            document.getElementById('summaryCard').style.display = 'block';
+
+            // Populate positions table
+            const tbody = document.getElementById('positionsTableBody');
+            tbody.innerHTML = '';
+
+            // Group positions by symbol
+            const positionsBySymbol = new Map();
+            equityPositions.forEach(pos => {
+                const symbol = pos.instrument?.symbol || 'N/A';
+                if (!positionsBySymbol.has(symbol)) {
+                    positionsBySymbol.set(symbol, []);
+                }
+                positionsBySymbol.get(symbol).push(pos);
+            });
+
+            // Sort symbols alphabetically
+            const sortedSymbols = [...positionsBySymbol.keys()].sort();
+
+            sortedSymbols.forEach(symbol => {
+                const positions = positionsBySymbol.get(symbol);
+
+                // Display each position row
+                positions.forEach(pos => {
+                    const quantity = pos.longQuantity || -pos.shortQuantity || 0;
+                    const avgPrice = pos.averagePrice || 0;
+                    const currentPrice = quantity !== 0 ? (pos.marketValue / Math.abs(quantity)) : avgPrice;
+                    const marketValue = pos.marketValue || 0;
+                    const dayPL = pos.currentDayProfitLoss || 0;
+                    const totalPL = marketValue - (avgPrice * Math.abs(quantity));
+                    const plPercent = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice * 100) : 0;
+
+                    const row = document.createElement('tr');
+
+                    // Color coding based on position type
+                    if (pos.shortQuantity > 0) {
+                        row.classList.add('position-short');
+                    } else {
+                        row.classList.add('position-long');
+                    }
+
+                    row.innerHTML = `
+                        <td><strong>${symbol}</strong></td>
+                        <td class="${quantity < 0 ? 'text-danger' : ''}">${quantity}</td>
+                        <td>${avgPrice.toFixed(2)}</td>
+                        <td>${currentPrice.toFixed(2)}</td>
+                        <td>${marketValue.toFixed(2)}</td>
+                        <td class="${dayPL >= 0 ? 'text-success' : 'text-danger'}">${formatPL(dayPL)}</td>
+                        <td class="${totalPL >= 0 ? 'text-success' : 'text-danger'}">${formatPL(totalPL)}</td>
+                        <td class="${plPercent >= 0 ? 'text-success' : 'text-danger'}">${plPercent >= 0 ? '+' : ''}${plPercent.toFixed(2)}%</td>
+                    `;
+
+                    tbody.appendChild(row);
+                });
+
+                // If there are multiple positions for this symbol, add a total row
+                if (positions.length > 1) {
+                    let totalQuantity = 0;
+                    let totalMarketVal = 0;
+                    let totalDayPL = 0;
+                    let totalCostBasis = 0;
+
+                    positions.forEach(pos => {
+                        const qty = pos.longQuantity || -pos.shortQuantity || 0;
+                        totalQuantity += qty;
+                        totalMarketVal += pos.marketValue || 0;
+                        totalDayPL += pos.currentDayProfitLoss || 0;
+                        totalCostBasis += (pos.averagePrice || 0) * Math.abs(qty);
+                    });
+
+                    const avgCostTotal = totalQuantity !== 0 ? totalCostBasis / Math.abs(totalQuantity) : 0;
+                    const currentPriceTotal = totalQuantity !== 0 ? totalMarketVal / Math.abs(totalQuantity) : 0;
+                    const totalPLCombined = totalMarketVal - totalCostBasis;
+                    const plPercentTotal = totalCostBasis > 0 ? ((totalMarketVal - totalCostBasis) / totalCostBasis * 100) : 0;
+
+                    const totalRow = document.createElement('tr');
+                    totalRow.classList.add('position-total');
+
+                    totalRow.innerHTML = `
+                        <td><strong>${symbol} TOTAL</strong></td>
+                        <td><strong>${totalQuantity}</strong></td>
+                        <td>${avgCostTotal.toFixed(2)}</td>
+                        <td>${currentPriceTotal.toFixed(2)}</td>
+                        <td><strong>${totalMarketVal.toFixed(2)}</strong></td>
+                        <td class="${totalDayPL >= 0 ? 'text-success' : 'text-danger'}"><strong>${formatPL(totalDayPL)}</strong></td>
+                        <td class="${totalPLCombined >= 0 ? 'text-success' : 'text-danger'}"><strong>${formatPL(totalPLCombined)}</strong></td>
+                        <td class="${plPercentTotal >= 0 ? 'text-success' : 'text-danger'}"><strong>${plPercentTotal >= 0 ? '+' : ''}${plPercentTotal.toFixed(2)}%</strong></td>
+                    `;
+
+                    tbody.appendChild(totalRow);
+                }
+            });
+
+            document.getElementById('positionCount').textContent = equityPositions.length;
+            document.getElementById('positionsTableCard').style.display = 'block';
+
+        } catch (error) {
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('errorMessage').textContent = `Error: ${error.message}`;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+    });
+
+    function formatCurrency(amount) {
+        return Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatPL(amount) {
+        const formatted = Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return amount >= 0 ? `+${formatted}` : `-${formatted}`;
+    }
+</script>
+
+<style>
+    .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .table tr.position-long,
+    .table-striped tbody tr.position-long,
+    .table tr.position-long td {
+        --bs-table-bg: rgba(40, 167, 69, 0.1);
+        --bs-table-bg-state: rgba(40, 167, 69, 0.1);
+    }
+
+    .table tr.position-short,
+    .table-striped tbody tr.position-short,
+    .table tr.position-short td {
+        --bs-table-bg: rgba(220, 53, 69, 0.1);
+        --bs-table-bg-state: rgba(220, 53, 69, 0.1);
+    }
+
+    .table tr.position-total,
+    .table-striped tbody tr.position-total,
+    .table tr.position-total td {
+        --bs-table-bg: rgba(135, 206, 250, 0.4);
+        --bs-table-bg-state: rgba(135, 206, 250, 0.4);
+        background-color: rgba(135, 206, 250, 0.4) !important;
+        border-top: 2px solid #87CEEB;
+        border-bottom: 2px solid #87CEEB;
+    }
+
+    .table tr.position-total:hover,
+    .table tr.position-total:hover td {
+        --bs-table-bg: rgba(135, 206, 250, 0.5);
+        background-color: rgba(135, 206, 250, 0.5) !important;
+    }
+</style>

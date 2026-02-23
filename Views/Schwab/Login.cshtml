@@ -1,0 +1,24 @@
+@{
+    ViewData["Title"] = "Schwab Login";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 text-center">
+            <h2>Connect to Schwab</h2>
+
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @TempData["Error"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            <p class="mt-3">Click the button below to authorize this application to access your Schwab account.</p>
+            <a href="@Url.Action("Authorize", "Schwab")" class="btn btn-primary btn-lg mt-4">
+                Connect to Schwab
+            </a>
+        </div>
+    </div>
+</div>

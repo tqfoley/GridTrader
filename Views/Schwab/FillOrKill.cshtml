@@ -1,0 +1,611 @@
+@{
+    ViewData["Title"] = "Fill or Kill";
+    ViewData["PageTitle"] = "Fill or Kill - MSTR";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            @Html.Partial("_DashboardNav")
+
+            @Html.Partial("_AccountInputs")
+
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">MSTR Current Prices (Schwab API)</h5>
+                </div>
+                <div class="card-body">
+                    <div id="priceLoading" class="text-center py-3">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Loading prices...
+                    </div>
+                    <div id="priceContainer" style="display: none;">
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-success bg-opacity-10">
+                                    <h6 class="text-muted">Bid Price (Sell at)</h6>
+                                    <h2 class="text-success" id="bidPrice">--</h2>
+                                    <small class="text-muted">Size: <span id="bidSize">--</span></small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-secondary bg-opacity-10">
+                                    <h6 class="text-muted">Last Price</h6>
+                                    <h2 class="text-primary" id="lastPrice">--</h2>
+                                    <small class="text-muted">Volume: <span id="totalVolume">--</span></small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-danger bg-opacity-10">
+                                    <h6 class="text-muted">Ask Price (Buy at)</h6>
+                                    <h2 class="text-danger" id="askPrice">--</h2>
+                                    <small class="text-muted">Size: <span id="askSize">--</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12 text-center">
+                                <span class="badge bg-warning text-dark fs-6">Spread: <span id="spread">--</span></span>
+                                <button id="refreshPrices" class="btn btn-sm btn-outline-primary ms-3">
+                                    Refresh Prices
+                                </button>
+                                <small class="text-muted ms-2">Last updated: <span id="lastUpdate">--</span></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="priceError" class="alert alert-danger mb-0" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Place Fill or Kill Order - MSTR (45 shares)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Fill or Kill (FOK):</strong> The order must be filled immediately in its entirety or it will be cancelled. No partial fills allowed.
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Order Type</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="orderType" id="buyOrder" value="BUY" checked>
+                                <label class="btn btn-outline-success" for="buyOrder">BUY 45 shares</label>
+
+                                <input type="radio" class="btn-check" name="orderType" id="sellOrder" value="SELL">
+                                <label class="btn btn-outline-danger" for="sellOrder">SELL 45 shares</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="limitPrice" class="form-label">Limit Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text"></span>
+                                <input type="number" class="form-control" id="limitPrice" step="0.01" placeholder="Enter limit price">
+                                <button type="button" class="btn btn-outline-secondary" id="useBidPrice">Use Bid</button>
+                                <button type="button" class="btn btn-outline-secondary" id="useAskPrice">Use Ask</button>
+                            </div>
+                            <small class="text-muted">For BUY: use Ask price or higher. For SELL: use Bid price or lower.</small>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded bg-light">
+                                <h6>Order Summary</h6>
+                                <table class="table table-sm mb-0">
+                                    <tr>
+                                        <td>Symbol:</td>
+                                        <td><strong>MSTR</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Quantity:</td>
+                                        <td><strong>45 shares</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Action:</td>
+                                        <td><strong id="summaryAction">BUY</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Price:</td>
+                                        <td><strong><span id="summaryPrice">--</span></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Duration:</td>
+                                        <td><strong>Fill or Kill</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Est. Total:</td>
+                                        <td><strong><span id="summaryTotal">--</span></strong></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center justify-content-center">
+                            <button id="placeOrderBtn" class="btn btn-lg btn-primary" disabled>
+                                Place Fill or Kill Order
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="orderResult" class="alert" style="display: none;"></div>
+
+            <div class="card" id="orderResponseCard" style="display: none;">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">Order Response</h5>
+                </div>
+                <div class="card-body">
+                    <pre id="orderResponseDisplay" class="bg-light p-3" style="max-height: 300px; overflow-y: auto;"></pre>
+                </div>
+            </div>
+
+            <hr class="my-5">
+
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">FBTC Current Prices (Schwab API)</h5>
+                </div>
+                <div class="card-body">
+                    <div id="fbtcPriceLoading" class="text-center py-3">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Loading FBTC prices...
+                    </div>
+                    <div id="fbtcPriceContainer" style="display: none;">
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-success bg-opacity-10">
+                                    <h6 class="text-muted">Bid Price (Sell at)</h6>
+                                    <h2 class="text-success" id="fbtcBidPrice">--</h2>
+                                    <small class="text-muted">Size: <span id="fbtcBidSize">--</span></small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-secondary bg-opacity-10">
+                                    <h6 class="text-muted">Last Price</h6>
+                                    <h2 class="text-primary" id="fbtcLastPrice">--</h2>
+                                    <small class="text-muted">Volume: <span id="fbtcTotalVolume">--</span></small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-danger bg-opacity-10">
+                                    <h6 class="text-muted">Ask Price (Buy at)</h6>
+                                    <h2 class="text-danger" id="fbtcAskPrice">--</h2>
+                                    <small class="text-muted">Size: <span id="fbtcAskSize">--</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12 text-center">
+                                <span class="badge bg-warning text-dark fs-6">Spread: <span id="fbtcSpread">--</span></span>
+                                <button id="refreshFbtcPrices" class="btn btn-sm btn-outline-primary ms-3">
+                                    Refresh Prices
+                                </button>
+                                <small class="text-muted ms-2">Last updated: <span id="fbtcLastUpdate">--</span></small>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="fbtcPriceError" class="alert alert-danger mb-0" style="display: none;"></div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header bg-orange text-white" style="background-color: #fd7e14;">
+                    <h5 class="mb-0">Place Market Order - FBTC (100 shares)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <strong>Market Order:</strong> The order will be executed immediately at the best available market price. Price may vary from the displayed quote.
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Order Type</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="fbtcOrderType" id="fbtcBuyOrder" value="BUY" checked>
+                                <label class="btn btn-outline-success" for="fbtcBuyOrder">BUY 100 shares</label>
+
+                                <input type="radio" class="btn-check" name="fbtcOrderType" id="fbtcSellOrder" value="SELL">
+                                <label class="btn btn-outline-danger" for="fbtcSellOrder">SELL 100 shares</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded bg-light">
+                                <h6>Order Summary</h6>
+                                <table class="table table-sm mb-0">
+                                    <tr>
+                                        <td>Symbol:</td>
+                                        <td><strong>FBTC</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Quantity:</td>
+                                        <td><strong>100 shares</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Action:</td>
+                                        <td><strong id="fbtcSummaryAction">BUY</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Order Type:</td>
+                                        <td><strong>MARKET</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Est. Price:</td>
+                                        <td><strong><span id="fbtcEstPrice">--</span></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Est. Total:</td>
+                                        <td><strong><span id="fbtcEstTotal">--</span></strong></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12 text-center">
+                            <button id="placeFbtcOrderBtn" class="btn btn-lg" style="background-color: #fd7e14; color: white;">
+                                Place FBTC Market Order
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="fbtcOrderResult" class="alert" style="display: none;"></div>
+
+            <div class="card" id="fbtcOrderResponseCard" style="display: none;">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">FBTC Order Response</h5>
+                </div>
+                <div class="card-body">
+                    <pre id="fbtcOrderResponseDisplay" class="bg-light p-3" style="max-height: 300px; overflow-y: auto;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SYMBOL = 'MSTR';
+    const QUANTITY = 45;
+    const FBTC_SYMBOL = 'FBTC';
+    const FBTC_QUANTITY = 100;
+    let currentBid = null;
+    let currentAsk = null;
+    let fbtcBid = null;
+    let fbtcAsk = null;
+
+    // Load prices on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        loadPrices();
+        loadFbtcPrices();
+    });
+
+    // Refresh prices button
+    document.getElementById('refreshPrices')?.addEventListener('click', loadPrices);
+
+    // Use Bid/Ask price buttons
+    document.getElementById('useBidPrice')?.addEventListener('click', function() {
+        if (currentBid) {
+            document.getElementById('limitPrice').value = currentBid.toFixed(2);
+            updateSummary();
+        }
+    });
+
+    document.getElementById('useAskPrice')?.addEventListener('click', function() {
+        if (currentAsk) {
+            document.getElementById('limitPrice').value = currentAsk.toFixed(2);
+            updateSummary();
+        }
+    });
+
+    // Update summary when inputs change and set appropriate price
+    document.querySelectorAll('input[name="orderType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            // Set price based on order type: BUY uses ask, SELL uses bid
+            if (this.value === 'BUY' && currentAsk) {
+                document.getElementById('limitPrice').value = currentAsk.toFixed(2);
+            } else if (this.value === 'SELL' && currentBid) {
+                document.getElementById('limitPrice').value = currentBid.toFixed(2);
+            }
+            updateSummary();
+        });
+    });
+    document.getElementById('limitPrice')?.addEventListener('input', updateSummary);
+
+    function updateSummary() {
+        const action = document.querySelector('input[name="orderType"]:checked')?.value || 'BUY';
+        const price = parseFloat(document.getElementById('limitPrice').value) || 0;
+
+        document.getElementById('summaryAction').textContent = action;
+        document.getElementById('summaryPrice').textContent = price > 0 ? price.toFixed(2) : '--';
+        document.getElementById('summaryTotal').textContent = price > 0 ? (price * QUANTITY).toFixed(2) : '--';
+
+        // Enable/disable place order button
+        document.getElementById('placeOrderBtn').disabled = price <= 0;
+    }
+
+    async function loadPrices() {
+        const password = document.getElementById('password')?.value || '';
+
+        document.getElementById('priceLoading').style.display = 'block';
+        document.getElementById('priceContainer').style.display = 'none';
+        document.getElementById('priceError').style.display = 'none';
+
+        try {
+            const response = await fetch(`/Schwab/GetSchwabQuote?symbol=${SYMBOL}&password=${encodeURIComponent(password)}`);
+
+            if (!response.ok) {
+                throw new Error(await response.text());
+            }
+
+            const data = await response.json();
+
+            // Schwab API returns data in format: { "MSTR": { "quote": { ... } } }
+            const quote = data[SYMBOL]?.quote;
+
+            if (!quote) {
+                throw new Error('No quote data received');
+            }
+
+            currentBid = quote.bidPrice;
+            currentAsk = quote.askPrice;
+            const lastPrice = quote.lastPrice;
+            const bidSize = quote.bidSize;
+            const askSize = quote.askSize;
+            const totalVolume = quote.totalVolume;
+            const spread = currentAsk - currentBid;
+
+            document.getElementById('bidPrice').textContent = `${currentBid.toFixed(2)}`;
+            document.getElementById('askPrice').textContent = `${currentAsk.toFixed(2)}`;
+            document.getElementById('lastPrice').textContent = `${lastPrice.toFixed(2)}`;
+            document.getElementById('bidSize').textContent = bidSize.toLocaleString();
+            document.getElementById('askSize').textContent = askSize.toLocaleString();
+            document.getElementById('totalVolume').textContent = totalVolume.toLocaleString();
+            document.getElementById('spread').textContent = spread.toFixed(2);
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+
+            document.getElementById('priceLoading').style.display = 'none';
+            document.getElementById('priceContainer').style.display = 'block';
+
+            // Set limit price based on current order type selection (BUY uses ask, SELL uses bid)
+            const selectedOrderType = document.querySelector('input[name="orderType"]:checked')?.value;
+            if (selectedOrderType === 'BUY') {
+                document.getElementById('limitPrice').value = currentAsk.toFixed(2);
+            } else {
+                document.getElementById('limitPrice').value = currentBid.toFixed(2);
+            }
+            updateSummary();
+
+        } catch (error) {
+            document.getElementById('priceLoading').style.display = 'none';
+            document.getElementById('priceError').textContent = `Error loading prices: ${error.message}`;
+            document.getElementById('priceError').style.display = 'block';
+        }
+    }
+
+    // Place order button
+    document.getElementById('placeOrderBtn')?.addEventListener('click', async function() {
+        const btn = this;
+        const accountHash = document.getElementById('accountHash')?.value;
+        const password = document.getElementById('password')?.value;
+        const action = document.querySelector('input[name="orderType"]:checked')?.value;
+        const price = parseFloat(document.getElementById('limitPrice').value);
+
+        if (!accountHash || !password) {
+            alert('Please enter account hash and password');
+            return;
+        }
+
+        if (!price || price <= 0) {
+            alert('Please enter a valid limit price');
+            return;
+        }
+
+        // Confirm order
+        const confirmMsg = `Place ${action} order for ${QUANTITY} shares of ${SYMBOL} at ${price.toFixed(2)}?\n\nTotal: ${(price * QUANTITY).toFixed(2)}\nDuration: Fill or Kill`;
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Placing Order...';
+
+        try {
+            const orderRequest = {
+                symbol: SYMBOL,
+                quantity: QUANTITY,
+                orderType: 'LIMIT',
+                price: price,
+                instruction: action,
+                duration: 'FILL_OR_KILL',
+                session: 'NORMAL'
+            };
+
+            const response = await fetch(`/Schwab/PlaceOrder?accountHash=${encodeURIComponent(accountHash)}&password=${encodeURIComponent(password)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(orderRequest)
+            });
+
+            const result = await response.json();
+
+            const resultDiv = document.getElementById('orderResult');
+
+            if (result.success) {
+                resultDiv.className = 'alert alert-success';
+                resultDiv.textContent = 'Order placed successfully!';
+            } else {
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.textContent = `Order failed: ${result.message}`;
+            }
+            resultDiv.style.display = 'block';
+
+            // Show response details
+            document.getElementById('orderResponseDisplay').textContent = JSON.stringify(result, null, 2);
+            document.getElementById('orderResponseCard').style.display = 'block';
+
+            // Refresh prices after order
+            loadPrices();
+
+        } catch (error) {
+            const resultDiv = document.getElementById('orderResult');
+            resultDiv.className = 'alert alert-danger';
+            resultDiv.textContent = `Error: ${error.message}`;
+            resultDiv.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Place Fill or Kill Order';
+        }
+    });
+
+    // FBTC Section
+    document.getElementById('refreshFbtcPrices')?.addEventListener('click', loadFbtcPrices);
+
+    // Update FBTC summary when order type changes
+    document.querySelectorAll('input[name="fbtcOrderType"]').forEach(radio => {
+        radio.addEventListener('change', updateFbtcSummary);
+    });
+
+    function updateFbtcSummary() {
+        const action = document.querySelector('input[name="fbtcOrderType"]:checked')?.value || 'BUY';
+        document.getElementById('fbtcSummaryAction').textContent = action;
+
+        // Use ask price for BUY, bid price for SELL
+        const estPrice = action === 'BUY' ? fbtcAsk : fbtcBid;
+        if (estPrice) {
+            document.getElementById('fbtcEstPrice').textContent = estPrice.toFixed(2);
+            document.getElementById('fbtcEstTotal').textContent = (estPrice * FBTC_QUANTITY).toFixed(2);
+        } else {
+            document.getElementById('fbtcEstPrice').textContent = '--';
+            document.getElementById('fbtcEstTotal').textContent = '--';
+        }
+    }
+
+    async function loadFbtcPrices() {
+        const password = document.getElementById('password')?.value || '';
+
+        document.getElementById('fbtcPriceLoading').style.display = 'block';
+        document.getElementById('fbtcPriceContainer').style.display = 'none';
+        document.getElementById('fbtcPriceError').style.display = 'none';
+
+        try {
+            const response = await fetch(`/Schwab/GetSchwabQuote?symbol=${FBTC_SYMBOL}&password=${encodeURIComponent(password)}`);
+
+            if (!response.ok) {
+                throw new Error(await response.text());
+            }
+
+            const data = await response.json();
+            const quote = data[FBTC_SYMBOL]?.quote;
+
+            if (!quote) {
+                throw new Error('No quote data received');
+            }
+
+            fbtcBid = quote.bidPrice;
+            fbtcAsk = quote.askPrice;
+            const lastPrice = quote.lastPrice;
+            const bidSize = quote.bidSize;
+            const askSize = quote.askSize;
+            const totalVolume = quote.totalVolume;
+            const spread = fbtcAsk - fbtcBid;
+
+            document.getElementById('fbtcBidPrice').textContent = `${fbtcBid.toFixed(2)}`;
+            document.getElementById('fbtcAskPrice').textContent = `${fbtcAsk.toFixed(2)}`;
+            document.getElementById('fbtcLastPrice').textContent = `${lastPrice.toFixed(2)}`;
+            document.getElementById('fbtcBidSize').textContent = bidSize.toLocaleString();
+            document.getElementById('fbtcAskSize').textContent = askSize.toLocaleString();
+            document.getElementById('fbtcTotalVolume').textContent = totalVolume.toLocaleString();
+            document.getElementById('fbtcSpread').textContent = spread.toFixed(2);
+            document.getElementById('fbtcLastUpdate').textContent = new Date().toLocaleTimeString();
+
+            document.getElementById('fbtcPriceLoading').style.display = 'none';
+            document.getElementById('fbtcPriceContainer').style.display = 'block';
+
+            updateFbtcSummary();
+
+        } catch (error) {
+            document.getElementById('fbtcPriceLoading').style.display = 'none';
+            document.getElementById('fbtcPriceError').textContent = `Error loading FBTC prices: ${error.message}`;
+            document.getElementById('fbtcPriceError').style.display = 'block';
+        }
+    }
+
+    // Place FBTC market order button
+    document.getElementById('placeFbtcOrderBtn')?.addEventListener('click', async function() {
+        const btn = this;
+        const accountHash = document.getElementById('accountHash')?.value;
+        const password = document.getElementById('password')?.value;
+        const action = document.querySelector('input[name="fbtcOrderType"]:checked')?.value;
+
+        if (!accountHash || !password) {
+            alert('Please enter account hash and password');
+            return;
+        }
+
+        const estPrice = action === 'BUY' ? fbtcAsk : fbtcBid;
+        const estTotal = estPrice ? (estPrice * FBTC_QUANTITY).toFixed(2) : 'unknown';
+
+        // Confirm order
+        const confirmMsg = `Place MARKET ${action} order for ${FBTC_QUANTITY} shares of ${FBTC_SYMBOL}?\n\nEstimated Total: ${estTotal}\n\nNote: Market orders execute at the best available price.`;
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Placing Order...';
+
+        try {
+            const orderRequest = {
+                symbol: FBTC_SYMBOL,
+                quantity: FBTC_QUANTITY,
+                orderType: 'MARKET',
+                instruction: action,
+                duration: 'DAY',
+                session: 'NORMAL'
+            };
+
+            const response = await fetch(`/Schwab/PlaceOrder?accountHash=${encodeURIComponent(accountHash)}&password=${encodeURIComponent(password)}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(orderRequest)
+            });
+
+            const result = await response.json();
+
+            const resultDiv = document.getElementById('fbtcOrderResult');
+
+            if (result.success) {
+                resultDiv.className = 'alert alert-success';
+                resultDiv.textContent = 'FBTC Market order placed successfully!';
+            } else {
+                resultDiv.className = 'alert alert-danger';
+                resultDiv.textContent = `FBTC Order failed: ${result.message}`;
+            }
+            resultDiv.style.display = 'block';
+
+            // Show response details
+            document.getElementById('fbtcOrderResponseDisplay').textContent = JSON.stringify(result, null, 2);
+            document.getElementById('fbtcOrderResponseCard').style.display = 'block';
+
+            // Refresh FBTC prices after order
+            loadFbtcPrices();
+
+        } catch (error) {
+            const resultDiv = document.getElementById('fbtcOrderResult');
+            resultDiv.className = 'alert alert-danger';
+            resultDiv.textContent = `Error: ${error.message}`;
+            resultDiv.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Place FBTC Market Order';
+        }
+    });
+</script>

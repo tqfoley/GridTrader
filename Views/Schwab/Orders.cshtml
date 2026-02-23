@@ -1,0 +1,479 @@
+@{
+    ViewData["Title"] = "Open Orders";
+    ViewData["PageTitle"] = "Open Orders";
+}
+
+<div class="container-fluid mt-4">
+    <div class="text-center mb-4">
+        <img src="/Images/SchwabOrdersDash.png" alt="Schwab Orders Dashboard" class="img-fluid" style="max-width: 600px;" />
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            @Html.Partial("_DashboardNav")
+
+            @Html.Partial("_AccountInputs")
+
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Fetch Orders</h5>
+                </div>
+                <div class="card-body">
+                    <form id="ordersForm">
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Reload Orders</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="alert alert-danger" style="display: none;"></div>
+            <div id="loadingMessage" class="alert alert-info" style="display: none;">
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Loading orders...
+            </div>
+
+            <div class="card mb-3" id="symbolFilterCard" style="display: none;">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <label for="symbolFilter" class="form-label mb-0"><strong>Filter by Symbol:</strong></label>
+                        </div>
+                        <div class="col-md-9">
+                            <select id="symbolFilter" class="form-select">
+                                <option value="">All Symbols</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="ordersTableCard" style="display: none;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Orders (<span id="orderCount">0</span>)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Order ID</th>
+                                    <th>Status</th>
+                                    <th>Symbol</th>
+                                    <th>Instruction</th>
+                                    <th>Quantity</th>
+                                    <th>Type</th>
+                                    <th>Price</th>
+                                    <th>Duration</th>
+                                    <th>Entered Time</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="noOrdersMessage" class="alert alert-info" style="display: none;">
+                No orders found for this account.
+            </div>
+
+            <div class="card mt-4" id="rawDataCard" style="display: none;">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Raw API Response</h5>
+                    <button type="button" id="copyJsonBtn" class="btn btn-outline-light btn-sm">Copy JSON</button>
+                </div>
+                <div class="card-body">
+                    <pre id="rawDataDisplay" class="bg-light p-3" style="max-height: 400px; overflow-y: auto;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global variable to store all orders for filtering
+    let allOrders = [];
+
+    // Copy JSON button handler
+    document.getElementById('copyJsonBtn')?.addEventListener('click', async function() {
+        const jsonText = document.getElementById('rawDataDisplay').textContent;
+        try {
+            await navigator.clipboard.writeText(jsonText);
+            this.textContent = 'Copied!';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        } catch (err) {
+            this.textContent = 'Failed';
+            setTimeout(() => { this.textContent = 'Copy JSON'; }, 2000);
+        }
+    });
+
+    // Symbol filter event listener
+    document.getElementById('symbolFilter')?.addEventListener('change', function() {
+        displayOrders(allOrders, this.value);
+    });
+
+    // Auto-load orders if both fields are populated
+    window.addEventListener('DOMContentLoaded', function() {
+        const savedPassword = sessionStorage.getItem('apiPassword');
+        const savedAccountHash = sessionStorage.getItem('accountHash');
+
+        if (savedPassword && savedAccountHash) {
+            document.getElementById('ordersForm').dispatchEvent(new Event('submit'));
+        }
+    });
+
+    document.getElementById('ordersForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const accountHash = document.getElementById('accountHash').value;
+        const accountHash2 = document.getElementById('accountHash2').value;
+        const password = document.getElementById('password').value;
+
+        // Hide previous results
+        document.getElementById('errorMessage').style.display = 'none';
+        document.getElementById('ordersTableCard').style.display = 'none';
+        document.getElementById('symbolFilterCard').style.display = 'none';
+        document.getElementById('noOrdersMessage').style.display = 'none';
+        document.getElementById('loadingMessage').style.display = 'block';
+
+        try {
+            // Fetch orders from first account
+            const response1 = await fetch(`/Schwab/GetOrders?accountHash=${encodeURIComponent(accountHash)}&password=${encodeURIComponent(password)}`);
+            let orders = [];
+
+            if (response1.ok) {
+                const data1 = await response1.json();
+                // Add accountHash to each order for deletion
+                if (Array.isArray(data1)) {
+                    data1.forEach(order => order._accountHash = accountHash);
+                    orders.push(...data1);
+                }
+            }
+
+            // Fetch orders from second account if populated
+            if (accountHash2) {
+                const response2 = await fetch(`/Schwab/GetOrders?accountHash=${encodeURIComponent(accountHash2)}&password=${encodeURIComponent(password)}`);
+                if (response2.ok) {
+                    const data2 = await response2.json();
+                    // Add accountHash to each order for deletion
+                    if (Array.isArray(data2)) {
+                        data2.forEach(order => order._accountHash = accountHash2);
+                        orders.push(...data2);
+                    }
+                }
+            }
+
+            document.getElementById('loadingMessage').style.display = 'none';
+
+            if (orders.length === 0) {
+                document.getElementById('noOrdersMessage').style.display = 'block';
+                return;
+            }
+
+            // Display raw JSON data
+            document.getElementById('rawDataDisplay').textContent = JSON.stringify(orders, null, 2);
+            document.getElementById('rawDataCard').style.display = 'block';
+
+            // Filter for open orders only (WORKING, QUEUED, ACCEPTED, PENDING_ACTIVATION, etc.)
+            const openStatuses = ['WORKING', 'QUEUED', 'ACCEPTED', 'PENDING_ACTIVATION', 'AWAITING_PARENT_ORDER',
+                                  'AWAITING_CONDITION', 'AWAITING_STOP_CONDITION', 'AWAITING_MANUAL_REVIEW',
+                                  'AWAITING_UR_OUT', 'PENDING_CANCEL', 'PENDING_REPLACE', 'NEW',
+                                  'AWAITING_RELEASE_TIME', 'PENDING_ACKNOWLEDGEMENT'];
+
+            const openOrders = orders.filter(order => openStatuses.includes(order.status));
+
+            if (openOrders.length === 0) {
+                document.getElementById('noOrdersMessage').textContent = 'No open orders found. All orders are either filled, canceled, or expired.';
+                document.getElementById('noOrdersMessage').style.display = 'block';
+                return;
+            }
+
+            // Store orders globally for filtering
+            allOrders = openOrders;
+
+            // Populate symbol filter dropdown
+            const symbols = [...new Set(openOrders.map(order => {
+                const orderLeg = order.orderLegCollection && order.orderLegCollection[0];
+                return orderLeg?.instrument?.symbol || 'N/A';
+            }))].sort();
+
+            const symbolFilter = document.getElementById('symbolFilter');
+            symbolFilter.innerHTML = '<option value="">All Symbols</option>';
+            symbols.forEach(symbol => {
+                const option = document.createElement('option');
+                option.value = symbol;
+                option.textContent = symbol;
+                symbolFilter.appendChild(option);
+            });
+
+            document.getElementById('symbolFilterCard').style.display = 'block';
+
+            // Display all orders initially
+            displayOrders(openOrders, '');
+
+        } catch (error) {
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('errorMessage').textContent = `Error: ${error.message}`;
+            document.getElementById('errorMessage').style.display = 'block';
+        }
+    });
+
+    function displayOrders(orders, filterSymbol) {
+        // Filter by symbol if specified
+        let filteredOrders = orders;
+        if (filterSymbol) {
+            filteredOrders = orders.filter(order => {
+                const orderLeg = order.orderLegCollection && order.orderLegCollection[0];
+                const symbol = orderLeg?.instrument?.symbol || 'N/A';
+                return symbol === filterSymbol;
+            });
+        }
+
+        if (filteredOrders.length === 0) {
+            document.getElementById('ordersTableCard').style.display = 'none';
+            document.getElementById('noOrdersMessage').textContent = filterSymbol
+                ? `No open orders found for ${filterSymbol}.`
+                : 'No open orders found.';
+            document.getElementById('noOrdersMessage').style.display = 'block';
+            return;
+        }
+
+        document.getElementById('noOrdersMessage').style.display = 'none';
+
+        // Populate table
+        const tbody = document.getElementById('ordersTableBody');
+        tbody.innerHTML = '';
+
+        // Sort orders by symbol first, then by price within each symbol
+        const sortedOrders = filteredOrders.map(order => {
+            const orderLeg = order.orderLegCollection && order.orderLegCollection[0];
+            const instrument = orderLeg ? orderLeg.instrument : {};
+            return {
+                order: order,
+                symbol: instrument.symbol || 'N/A',
+                price: order.price || 0
+            };
+        }).sort((a, b) => {
+            // First sort by symbol
+            if (a.symbol !== b.symbol) {
+                return a.symbol.localeCompare(b.symbol);
+            }
+            // Then sort by price (ascending)
+            return a.price - b.price;
+        });
+
+        let lastSymbol = null;
+
+        sortedOrders.forEach(item => {
+            const order = item.order;
+            const symbol = item.symbol;
+
+            // Add divider row when symbol changes (only if not filtering by symbol)
+            if (!filterSymbol && lastSymbol !== null && lastSymbol !== symbol) {
+                const dividerRow = document.createElement('tr');
+                dividerRow.className = 'symbol-divider';
+                dividerRow.innerHTML = '<td colspan="10"></td>';
+                tbody.appendChild(dividerRow);
+            }
+            lastSymbol = symbol;
+
+            const orderLeg = order.orderLegCollection && order.orderLegCollection[0];
+            const instruction = orderLeg ? orderLeg.instruction : 'N/A';
+            const quantity = orderLeg ? orderLeg.quantity : 0;
+
+            // Format duration + session display
+            const durationDisplay = formatDurationSession(order.duration, order.session);
+
+            const row = document.createElement('tr');
+
+            row.innerHTML = `
+                <td>${order.orderId || 'N/A'}</td>
+                <td><span class="badge bg-${getStatusBadgeClass(order.status)}">${order.status}</span></td>
+                <td><strong>${symbol}</strong></td>
+                <td>${instruction}</td>
+                <td>${quantity}</td>
+                <td>${order.orderType || 'N/A'}</td>
+                <td>${order.price ? order.price.toFixed(2) : 'MARKET'}</td>
+                <td>${durationDisplay}</td>
+                <td>${formatDate(order.enteredTime)}</td>
+                <td>
+                    <button class="btn btn-danger btn-sm delete-order-btn"
+                            data-order-id="${order.orderId}"
+                            data-account-hash="${order._accountHash || ''}"
+                            data-symbol="${symbol}"
+                            data-instruction="${instruction}"
+                            data-quantity="${quantity}">
+                        Delete
+                    </button>
+                </td>
+            `;
+
+            // Add color-coded class based on instruction type (after setting innerHTML)
+            if (instruction === 'BUY' || instruction === 'BUY_TO_COVER') {
+                row.classList.add('order-buy');
+            } else if (instruction === 'SELL' || instruction === 'SELL_SHORT') {
+                row.classList.add('order-sell');
+            }
+
+            tbody.appendChild(row);
+        });
+
+        document.getElementById('orderCount').textContent = filteredOrders.length;
+        document.getElementById('ordersTableCard').style.display = 'block';
+    }
+
+    function getStatusBadgeClass(status) {
+        const workingStatuses = ['WORKING', 'QUEUED', 'ACCEPTED'];
+        const pendingStatuses = ['PENDING_ACTIVATION', 'AWAITING_PARENT_ORDER', 'AWAITING_CONDITION',
+                                 'AWAITING_STOP_CONDITION', 'AWAITING_MANUAL_REVIEW', 'AWAITING_UR_OUT',
+                                 'PENDING_CANCEL', 'PENDING_REPLACE', 'NEW', 'AWAITING_RELEASE_TIME',
+                                 'PENDING_ACKNOWLEDGEMENT'];
+
+        if (workingStatuses.includes(status)) return 'success';
+        if (pendingStatuses.includes(status)) return 'warning';
+        return 'secondary';
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        return date.toLocaleString();
+    }
+
+    function formatDurationSession(duration, session) {
+        let display = duration || 'N/A';
+
+        // Convert API values to readable format
+        if (duration === 'GOOD_TILL_CANCEL') {
+            display = 'GTC';
+        }
+
+        // Add extended hours indicator if session is SEAMLESS
+        if (session === 'SEAMLESS') {
+            display += ' +Ext';
+        }
+
+        return display;
+    }
+
+    // Handle delete button clicks using event delegation
+    document.getElementById('ordersTableBody').addEventListener('click', async function(e) {
+        if (e.target.classList.contains('delete-order-btn')) {
+            const orderId = e.target.getAttribute('data-order-id');
+            const symbol = e.target.getAttribute('data-symbol');
+            const instruction = e.target.getAttribute('data-instruction');
+            const quantity = e.target.getAttribute('data-quantity');
+            const accountHash = e.target.getAttribute('data-account-hash') || document.getElementById('accountHash').value;
+            const password = document.getElementById('password').value;
+
+            // Confirm deletion
+            const confirmMsg = `Are you sure you want to cancel this order?\n\n` +
+                              `Order ID: ${orderId}\n` +
+                              `${instruction} ${quantity} shares of ${symbol}`;
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            // Disable button and show loading
+            e.target.disabled = true;
+            e.target.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const response = await fetch(`/Schwab/CancelOrder?accountHash=${encodeURIComponent(accountHash)}&orderId=${encodeURIComponent(orderId)}&password=${encodeURIComponent(password)}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    alert('Order cancelled successfully!');
+                    // Remove the row from the table
+                    e.target.closest('tr').remove();
+                    // Update the order count
+                    const currentCount = parseInt(document.getElementById('orderCount').textContent);
+                    document.getElementById('orderCount').textContent = currentCount - 1;
+
+                    // If no orders left, show no orders message
+                    if (currentCount - 1 === 0) {
+                        document.getElementById('ordersTableCard').style.display = 'none';
+                        document.getElementById('noOrdersMessage').textContent = 'No open orders found.';
+                        document.getElementById('noOrdersMessage').style.display = 'block';
+                    }
+                } else {
+                    alert('Failed to cancel order: ' + (result.message || 'Unknown error'));
+                    e.target.disabled = false;
+                    e.target.innerHTML = 'Delete';
+                }
+            } catch (error) {
+                alert('Error cancelling order: ' + error.message);
+                e.target.disabled = false;
+                e.target.innerHTML = 'Delete';
+            }
+        }
+    });
+</script>
+
+<style>
+    .table-responsive {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .symbol-divider td {
+        height: 8px;
+        padding: 0 !important;
+        background: linear-gradient(to right, #dee2e6 0%, #dee2e6 100%);
+        border-top: 2px solid #adb5bd;
+        border-bottom: 2px solid #adb5bd;
+    }
+
+    .symbol-divider:hover {
+        background-color: transparent !important;
+    }
+
+    .table tr.order-buy,
+    .table-striped tbody tr.order-buy,
+    .table tr.order-buy td {
+        --bs-table-bg: rgba(40, 167, 69, 0.15);
+        --bs-table-bg-state: rgba(40, 167, 69, 0.15);
+        --bs-table-bg-type: rgba(40, 167, 69, 0.15);
+        background-color: rgba(40, 167, 69, 0.15) !important;
+    }
+
+    .table tr.order-buy:hover,
+    .table tr.order-buy:hover td,
+    .table-striped tbody tr.order-buy:hover,
+    .table-striped tbody tr.order-buy:hover td,
+    .table-hover tbody tr.order-buy:hover,
+    .table-hover tbody tr.order-buy:hover td {
+        --bs-table-bg: rgba(40, 167, 69, 0.25);
+        --bs-table-bg-state: rgba(40, 167, 69, 0.25);
+        --bs-table-bg-type: rgba(40, 167, 69, 0.25);
+        background-color: rgba(40, 167, 69, 0.25) !important;
+    }
+
+    .table tr.order-sell,
+    .table-striped tbody tr.order-sell,
+    .table tr.order-sell td {
+        --bs-table-bg: rgba(220, 53, 69, 0.15);
+        --bs-table-bg-state: rgba(220, 53, 69, 0.15);
+        --bs-table-bg-type: rgba(220, 53, 69, 0.15);
+        background-color: rgba(220, 53, 69, 0.15) !important;
+    }
+
+    .table tr.order-sell:hover,
+    .table tr.order-sell:hover td,
+    .table-striped tbody tr.order-sell:hover,
+    .table-striped tbody tr.order-sell:hover td,
+    .table-hover tbody tr.order-sell:hover,
+    .table-hover tbody tr.order-sell:hover td {
+        --bs-table-bg: rgba(220, 53, 69, 0.25);
+        --bs-table-bg-state: rgba(220, 53, 69, 0.25);
+        --bs-table-bg-type: rgba(220, 53, 69, 0.25);
+        background-color: rgba(220, 53, 69, 0.25) !important;
+    }
+</style>

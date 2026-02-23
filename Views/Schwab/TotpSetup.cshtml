@@ -1,0 +1,84 @@
+@model SchwabOAuthApp.Models.TotpSetupViewModel
+@{
+    ViewData["Title"] = "Setup Google Authenticator";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Setup Google Authenticator</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Step 1:</strong> Install Google Authenticator on your mobile device if you haven't already.
+                    </div>
+
+                    <div class="text-center mb-4">
+                        <h5>Step 2: Scan this QR Code</h5>
+                        <img src="data:image/png;base64,@Model.QrCodeBase64" alt="QR Code" class="img-fluid" style="max-width: 300px;" />
+                    </div>
+
+                    <div class="alert alert-secondary">
+                        <h5>Or manually enter this key:</h5>
+                        <div class="input-group">
+                            <input type="text" class="form-control" value="@Model.ManualEntryKey" id="manualKey" readonly />
+                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard()">
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <strong>Step 3:</strong> Enter the 6-digit code from your authenticator app to confirm setup.
+                    </div>
+
+                    @if (TempData["Error"] != null)
+                    {
+                        <div class="alert alert-danger">
+                            @TempData["Error"]
+                        </div>
+                    }
+
+                    <form method="post" action="@Url.Action("ConfirmSetup", "Schwab")">
+                        <div class="mb-3">
+                            <label for="code" class="form-label">Authenticator Code</label>
+                            <input type="text" class="form-control form-control-lg text-center" id="code" name="code"
+                                   maxlength="6" pattern="[0-9]{6}" required autocomplete="off"
+                                   placeholder="000000" style="letter-spacing: 0.5em; font-size: 1.5rem;" />
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Verify and Complete Setup</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function copyToClipboard() {
+        var copyText = document.getElementById("manualKey");
+        copyText.select();
+        copyText.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(copyText.value);
+
+        var button = event.target;
+        var originalText = button.textContent;
+        button.textContent = "Copied!";
+        setTimeout(function() {
+            button.textContent = originalText;
+        }, 2000);
+    }
+
+    // Auto-submit when 6 digits are entered
+    document.getElementById('code').addEventListener('input', function(e) {
+        var value = e.target.value.replace(/\D/g, '');
+        e.target.value = value;
+        if (value.length === 6) {
+            e.target.form.submit();
+        }
+    });
+</script>

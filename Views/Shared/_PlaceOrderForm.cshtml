@@ -1,0 +1,348 @@
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Place Order</h4>
+            </div>
+            <div class="card-body">
+                <form id="orderForm">
+                    <div class="mb-3">
+                        <label for="apiPassword" class="form-label">API Password:</label>
+                        <input type="text" id="apiPassword" class="form-control" placeholder="Enter API password">
+                        <small class="text-muted">Password configured in appsettings.json</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="accountHash" class="form-label">Account Hash:</label>
+                        <input type="text" id="accountHash" class="form-control" placeholder="Enter your account hash" required>
+                        <small class="text-muted">Get this from Dashboard > Get Account Numbers</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="symbol" class="form-label">Symbol:</label>
+                        <input type="text" id="symbol" class="form-control" placeholder="e.g., AAPL, TSLA, SPY" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="instruction" class="form-label">Action:</label>
+                        <select id="instruction" class="form-select" required>
+                            <option value="BUY">Buy</option>
+                            <option value="SELL">Sell</option>
+                            <option value="SELL_SHORT">Sell Short</option>
+                            <option value="BUY_TO_COVER">Buy to Cover</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Quantity:</label>
+                        <input type="number" id="quantity" class="form-control" min="1" value="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="orderType" class="form-label">Order Type:</label>
+                        <select id="orderType" class="form-select" required>
+                            <option value="LIMIT">Limit Order</option>
+                            <option value="MARKET">Market Order</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="priceGroup">
+                        <label for="price" class="form-label">Limit Price:</label>
+                        <input type="number" id="price" class="form-control" step="0.01" placeholder="Enter limit price">
+                        <small class="text-muted">Required for limit orders</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="durationSession" class="form-label">Duration & Session:</label>
+                        <select id="durationSession" class="form-select" required>
+                            <option value="GTC_SEAMLESS">Good Till Cancelled + Extended Hours</option>
+                            <option value="DAY_NORMAL">Day</option>
+                            <option value="DAY_SEAMLESS">Day + Extended Hours</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="cancelDateGroup">
+                        <label for="cancelDate" class="form-label">Cancel Date (optional):</label>
+                        <input type="date" id="cancelDate" class="form-control">
+                        <small class="text-muted">Leave blank for no expiration (up to 180 days)</small>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" id="placeOrderBtn" class="btn btn-success btn-lg">Place Order</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Order Preview & Response</h4>
+            </div>
+            <div class="card-body">
+                <div id="orderPreview" class="mb-3">
+                    <h6>Order Details:</h6>
+                    <div id="previewContent" class="border p-3 bg-light">
+                        Fill out the form to see order preview
+                    </div>
+                </div>
+
+                <div id="orderResponse" style="display:none;">
+                    <h6>API Response:</h6>
+                    <pre id="responseContent" class="border p-3" style="max-height: 400px; overflow-y: auto;"></pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">Important Notes</h5>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>Orders placed here are <strong>real trades</strong></li>
+                    <li>Market orders execute at current market price</li>
+                    <li>Limit orders only execute at your specified price or better</li>
+                    <li>DAY orders expire at market close</li>
+                    <li>GTC orders remain active until filled or cancelled</li>
+                    <li><strong>Short Selling:</strong> Use "Sell Short" to open a short position, "Buy to Cover" to close it</li>
+                    <li>Short selling requires margin approval and has unlimited risk potential</li>
+                    <li>Always verify your order details before placing</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const orderTypeSelect = document.getElementById('orderType');
+        const priceGroup = document.getElementById('priceGroup');
+        const priceInput = document.getElementById('price');
+        const orderForm = document.getElementById('orderForm');
+        const previewContent = document.getElementById('previewContent');
+        const orderResponse = document.getElementById('orderResponse');
+        const responseContent = document.getElementById('responseContent');
+        const durationSessionSelect = document.getElementById('durationSession');
+        const cancelDateGroup = document.getElementById('cancelDateGroup');
+        const cancelDateInput = document.getElementById('cancelDate');
+
+        // Load saved values from sessionStorage on page load
+        const savedPassword = sessionStorage.getItem('apiPassword');
+        const savedAccountHash = sessionStorage.getItem('accountHash');
+
+        if (savedPassword) {
+            document.getElementById('apiPassword').value = savedPassword;
+        }
+        if (savedAccountHash) {
+            document.getElementById('accountHash').value = savedAccountHash;
+        }
+
+        // Set default cancel date to 59 days from today (since GTC is default)
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 59);
+        cancelDateInput.value = futureDate.toISOString().split('T')[0];
+
+        // Price field is visible by default since LIMIT is default
+        priceInput.required = true;
+
+        // Save values to sessionStorage when they change
+        document.getElementById('apiPassword')?.addEventListener('input', function() {
+            sessionStorage.setItem('apiPassword', this.value);
+        });
+
+        document.getElementById('accountHash')?.addEventListener('input', function() {
+            sessionStorage.setItem('accountHash', this.value);
+        });
+
+        // Show/hide price field based on order type
+        orderTypeSelect.addEventListener('change', function() {
+            if (this.value === 'LIMIT') {
+                priceGroup.style.display = 'block';
+                priceInput.required = true;
+            } else {
+                priceGroup.style.display = 'none';
+                priceInput.required = false;
+            }
+            updatePreview();
+        });
+
+        // Show/hide cancel date field based on duration selection
+        durationSessionSelect.addEventListener('change', function() {
+            if (this.value.startsWith('GTC')) {
+                cancelDateGroup.style.display = 'block';
+                // Default to 59 days from today
+                const futureDate = new Date();
+                futureDate.setDate(futureDate.getDate() + 59);
+                cancelDateInput.value = futureDate.toISOString().split('T')[0];
+            } else {
+                cancelDateGroup.style.display = 'none';
+                cancelDateInput.value = '';
+            }
+            updatePreview();
+        });
+
+        // Helper function to parse duration/session combo and get cancel date
+        function parseDurationSession(value) {
+            const parts = value.split('_');
+            let duration = parts[0];
+            let session = parts[1];
+
+            // Get cancel date from the date input field
+            let cancelDate = cancelDateInput.value || null;
+
+            // Convert GTC to API value GOOD_TILL_CANCEL
+            if (duration === 'GTC') {
+                duration = 'GOOD_TILL_CANCEL';
+            }
+
+            return { duration, session, cancelDate };
+        }
+
+        // Update preview as form changes
+        ['symbol', 'instruction', 'quantity', 'orderType', 'price', 'durationSession', 'cancelDate'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', updatePreview);
+            document.getElementById(id)?.addEventListener('change', updatePreview);
+        });
+
+        function updatePreview() {
+            const symbol = document.getElementById('symbol').value || '[Symbol]';
+            const instruction = document.getElementById('instruction').value;
+            const quantity = document.getElementById('quantity').value || '0';
+            const orderType = document.getElementById('orderType').value;
+            const price = document.getElementById('price').value;
+            const durationSessionValue = document.getElementById('durationSession').value;
+            const { duration, session, cancelDate } = parseDurationSession(durationSessionValue);
+
+            // Format instruction for display
+            const instructionDisplay = instruction.replace('_', ' ');
+
+            // Format duration/session for display
+            const durationDisplay = duration === 'GOOD_TILL_CANCEL' ? 'Good Till Cancelled' : 'Day';
+            const sessionDisplay = session === 'SEAMLESS' ? 'Extended Hours' : 'Normal';
+
+            let preview = `<strong>${instructionDisplay}</strong> ${quantity} shares of <strong>${symbol}</strong><br>`;
+            preview += `Order Type: <strong>${orderType}</strong>`;
+
+            if (orderType === 'LIMIT' && price) {
+                preview += ` at ${price}`;
+            }
+
+            preview += `<br>Duration: <strong>${durationDisplay}</strong>`;
+            preview += `<br>Session: <strong>${sessionDisplay}</strong>`;
+            if (cancelDate) {
+                preview += `<br>Cancel Date: <strong>${cancelDate}</strong>`;
+            }
+
+            previewContent.innerHTML = preview;
+        }
+
+        // Handle form submission
+        orderForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const password = document.getElementById('apiPassword').value;
+            const accountHash = document.getElementById('accountHash').value;
+            const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+            const instruction = document.getElementById('instruction').value;
+            const quantity = parseInt(document.getElementById('quantity').value);
+            const orderType = document.getElementById('orderType').value;
+            const price = document.getElementById('price').value ? parseFloat(document.getElementById('price').value) : null;
+            const durationSessionValue = document.getElementById('durationSession').value;
+            const { duration, session, cancelDate } = parseDurationSession(durationSessionValue);
+
+            // Validate
+            if (!accountHash || !symbol || quantity <= 0) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            if (orderType === 'LIMIT' && (!price || price <= 0)) {
+                alert('Please enter a valid limit price');
+                return;
+            }
+
+            // Confirm order
+            const instructionDisplay = instruction.replace(/_/g, ' ');
+            const durationDisplay = duration === 'GOOD_TILL_CANCEL' ? 'Good Till Cancelled' : 'Day';
+            const sessionDisplay = session === 'SEAMLESS' ? 'Extended Hours' : 'Normal';
+            let confirmMsg = `Are you sure you want to place this order?\n\n`;
+            confirmMsg += `${instructionDisplay} ${quantity} shares of ${symbol}\n`;
+            confirmMsg += `Order Type: ${orderType}`;
+            if (orderType === 'LIMIT') {
+                confirmMsg += ` at ${price}`;
+            }
+            confirmMsg += `\nDuration: ${durationDisplay}\nSession: ${sessionDisplay}`;
+            if (cancelDate) {
+                confirmMsg += `\nCancel Date: ${cancelDate}`;
+            }
+
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            // Disable button and show loading
+            const placeOrderBtn = document.getElementById('placeOrderBtn');
+            placeOrderBtn.disabled = true;
+            placeOrderBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Placing Order...';
+
+            try {
+                const orderData = {
+                    symbol: symbol,
+                    quantity: quantity,
+                    orderType: orderType,
+                    price: price,
+                    instruction: instruction,
+                    duration: duration,
+                    session: session,
+                    cancelDate: cancelDate
+                };
+
+                const response = await fetch('/Schwab/PlaceOrder?password=' + encodeURIComponent(password) + '&accountHash=' + encodeURIComponent(accountHash), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(orderData)
+                });
+
+                const result = await response.json();
+
+                orderResponse.style.display = 'block';
+
+                if (response.ok && result.success) {
+                    responseContent.style.backgroundColor = '#d4edda';
+                    responseContent.style.color = '#155724';
+                    responseContent.textContent = JSON.stringify(result, null, 2);
+                    alert('Order placed successfully!');
+                    // Preserve accountHash and password before reset
+                    const savedAccountHash = document.getElementById('accountHash').value;
+                    const savedApiPassword = document.getElementById('apiPassword').value;
+                    orderForm.reset();
+                    // Restore accountHash and password after reset
+                    document.getElementById('accountHash').value = savedAccountHash;
+                    document.getElementById('apiPassword').value = savedApiPassword;
+                    updatePreview();
+                } else {
+                    responseContent.style.backgroundColor = '#f8d7da';
+                    responseContent.style.color = '#721c24';
+                    responseContent.textContent = JSON.stringify(result, null, 2);
+                    alert('Order failed: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                orderResponse.style.display = 'block';
+                responseContent.style.backgroundColor = '#f8d7da';
+                responseContent.style.color = '#721c24';
+                responseContent.textContent = 'Error: ' + error.message;
+                alert('Error placing order: ' + error.message);
+            } finally {
+                placeOrderBtn.disabled = false;
+                placeOrderBtn.innerHTML = 'Place Order';
+            }
+        });
+
+        // Initialize preview
+        updatePreview();
+    })();
+</script>

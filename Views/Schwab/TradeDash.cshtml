@@ -1,0 +1,27 @@
+@{
+    ViewData["Title"] = "Trade Dashboard";
+    ViewData["PageTitle"] = "Trade Dashboard";
+}
+
+<div class="container mt-5">
+    <div class="text-center mb-4">
+        <img src="/Images/SchwabTradeDash.png" alt="Schwab Trade Dashboard" class="img-fluid" style="max-width: 600px;" />
+    </div>
+
+    @Html.Partial("_DashboardNav")
+
+    @if (ViewBag.HasToken)
+    {
+        <div class="alert alert-success">
+            Connected to Schwab - Ready to place orders
+        </div>
+
+        @Html.Partial("_PlaceOrderForm")
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            Not connected to Schwab. Please <a asp-action="Login">login</a>.
+        </div>
+    }
+</div>
