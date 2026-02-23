@@ -11,6 +11,10 @@
 *.sln.docstates
 *.env
 
+# Sensitive token/secret files
+schwabtokens.json
+totpsecret.txt
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
