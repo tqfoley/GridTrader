@@ -13,6 +13,7 @@ namespace SchwabOAuthApp.Controllers
         private readonly SchwabOAuthApp.Services.ITotpService _totpService;
         private readonly SchwabOAuthApp.Services.ITokenStorageService _tokenStorage;
         private readonly SchwabOrderService _orderService;
+        private readonly SchwabOAuthApp.Services.IPriceSnapshotService _priceSnapshots;
 
         // Schwab OAuth endpoints
         private const string AuthorizationEndpoint = "https://api.schwabapi.com/v1/oauth/authorize";
@@ -21,8 +22,9 @@ namespace SchwabOAuthApp.Controllers
         // Schwab API base URL
         private const string ApiBaseUrl = "https://api.schwabapi.com/trader/v1";
 
-        public SchwabController(IConfiguration configuration, IHttpClientFactory httpClientFactory, SchwabOAuthApp.Services.ITotpService totpService, SchwabOAuthApp.Services.ITokenStorageService tokenStorage, SchwabOrderService orderService)
+        public SchwabController(IConfiguration configuration, IHttpClientFactory httpClientFactory, SchwabOAuthApp.Services.ITotpService totpService, SchwabOAuthApp.Services.ITokenStorageService tokenStorage, SchwabOrderService orderService, SchwabOAuthApp.Services.IPriceSnapshotService priceSnapshots)
         {
+            _priceSnapshots = priceSnapshots;
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
             _totpService = totpService;
@@ -1568,6 +1570,127 @@ namespace SchwabOAuthApp.Controllers
                 {
                     return StatusCode((int)response.StatusCode, content);
                 }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
+        }
+        // ===================== Price Log (Neon Postgres) =====================
+
+        // Page: Neon status + save a ticker price + last 50 rows
+        [HttpGet]
+        public IActionResult PriceLog()
+        {
+            ViewData["Title"] = "Price Log";
+            ViewData["PageTitle"] = "Price Log";
+            return View();
+        }
+
+        // Neon connectivity status (JSON)
+        [HttpGet]
+        public async Task<IActionResult> GetPriceLogStatus()
+        {
+            var status = await _priceSnapshots.GetStatusAsync();
+            return Json(status);
+        }
+
+        // Most recent saved prices (JSON), newest first, default 50
+        [HttpGet]
+        public async Task<IActionResult> GetRecentPrices(int limit = 50)
+        {
+            try
+            {
+                var rows = await _priceSnapshots.GetRecentAsync(limit);
+                return Json(rows);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error: {ex.Message}");
+            }
+        }
+
+        // Fetches the current price for a ticker from the chosen service (EODHD or Schwab)
+        // and stores ticker, price in USD, service name, and timestamp in Neon.
+        [HttpPost]
+        public async Task<IActionResult> SavePrice(string symbol, string service = "EODHD", string password = "")
+        {
+            if (string.IsNullOrWhiteSpace(symbol))
+            {
+                return BadRequest("Symbol is required");
+            }
+
+            symbol = symbol.Trim().ToUpperInvariant();
+            service = (service ?? "EODHD").Trim();
+
+            try
+            {
+                decimal price;
+                string serviceName;
+
+                if (service.Equals("Schwab", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!CheckPassword(password, "SavePrice"))
+                    {
+                        return Unauthorized("Invalid password");
+                    }
+
+                    var accessToken = await GetValidAccessTokenAsync();
+                    if (string.IsNullOrEmpty(accessToken))
+                    {
+                        return Unauthorized("Not authenticated with Schwab");
+                    }
+
+                    var client = _httpClientFactory.CreateClient();
+                    client.DefaultRequestHeaders.Add("Authorization", $"Bearer {accessToken}");
+                    client.DefaultRequestHeaders.Add("Accept", "application/json");
+
+                    var apiUrl = $"https://api.schwabapi.com/marketdata/v1/quotes?symbols={Uri.EscapeDataString(symbol)}&fields=quote";
+                    var response = await client.GetAsync(apiUrl);
+                    var content = await response.Content.ReadAsStringAsync();
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        return StatusCode((int)response.StatusCode, content);
+                    }
+
+                    // Schwab format: { "QBTS": { "quote": { "lastPrice": 25.50 } } }
+                    using var doc = JsonDocument.Parse(content);
+                    if (!doc.RootElement.TryGetProperty(symbol, out var symbolEl) ||
+                        !symbolEl.TryGetProperty("quote", out var quoteEl) ||
+                        !quoteEl.TryGetProperty("lastPrice", out var priceEl) ||
+                        !priceEl.TryGetDecimal(out price))
+                    {
+                        return StatusCode(502, $"Schwab did not return a lastPrice for {symbol}");
+                    }
+                    serviceName = "Schwab";
+                }
+                else
+                {
+                    var client = _httpClientFactory.CreateClient();
+                    var apiToken = _configuration["EODHD:ApiToken"];
+                    var apiSymbol = symbol.Contains('.') ? symbol : $"{symbol}.US";
+                    var url = $"https://eodhistoricaldata.com/api/real-time/{Uri.EscapeDataString(apiSymbol)}?api_token={apiToken}&fmt=json";
+
+                    var response = await client.GetAsync(url);
+                    var content = await response.Content.ReadAsStringAsync();
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        return StatusCode((int)response.StatusCode, content);
+                    }
+
+                    // EODHD format: { "code": "QBTS.US", "close": 25.50, ... }
+                    using var doc = JsonDocument.Parse(content);
+                    if (!doc.RootElement.TryGetProperty("close", out var closeEl) ||
+                        closeEl.ValueKind != JsonValueKind.Number ||
+                        !closeEl.TryGetDecimal(out price))
+                    {
+                        return StatusCode(502, $"EODHD did not return a numeric close price for {symbol}");
+                    }
+                    serviceName = "EODHD";
+                }
+
+                var saved = await _priceSnapshots.SaveAsync(symbol, price, serviceName);
+                return Json(saved);
             }
             catch (Exception ex)
             {

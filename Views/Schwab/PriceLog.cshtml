@@ -1,0 +1,241 @@
+@{
+    ViewData["Title"] = "Price Log";
+    ViewData["PageTitle"] = "Price Log";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            @Html.Partial("_DashboardNav")
+
+            @Html.Partial("_AccountInputs")
+
+            <!-- Neon status -->
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Neon Database Status</h5>
+                    <button id="refreshStatusBtn" class="btn btn-light btn-sm">Check Status</button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <small class="text-muted">Connection</small>
+                            <div><span id="statusBadge" class="badge bg-secondary">Unknown</span></div>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Database</small>
+                            <div id="statusDb">--</div>
+                        </div>
+                        <div class="col-md-2">
+                            <small class="text-muted">Postgres</small>
+                            <div id="statusVersion">--</div>
+                        </div>
+                        <div class="col-md-2">
+                            <small class="text-muted">Rows in price_snapshots</small>
+                            <div id="statusRows">--</div>
+                        </div>
+                        <div class="col-md-2">
+                            <small class="text-muted">Latency</small>
+                            <div id="statusLatency">--</div>
+                        </div>
+                    </div>
+                    <div id="statusError" class="alert alert-danger mt-3 mb-0" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Save price -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Save Ticker Price</h5>
+                </div>
+                <div class="card-body">
+                    <form id="savePriceForm">
+                        <div class="row align-items-end">
+                            <div class="col-md-4">
+                                <label for="symbol" class="form-label">Ticker Symbol</label>
+                                <input type="text" class="form-control text-uppercase" id="symbol" name="symbol" placeholder="e.g. QBTS" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="service" class="form-label">Price Service</label>
+                                <select class="form-select" id="service" name="service">
+                                    <option value="EODHD" selected>EODHD</option>
+                                    <option value="Schwab">Schwab (requires API password above)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-grid">
+                                <button type="submit" class="btn btn-success btn-lg" id="saveBtn">Fetch &amp; Save Price</button>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="saveMessage" class="alert mt-3 mb-0" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Recent rows -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Last 50 Saved Prices</h5>
+                    <button id="reloadRowsBtn" class="btn btn-light btn-sm">Reload</button>
+                </div>
+                <div class="card-body">
+                    <div id="rowsError" class="alert alert-danger" style="display: none;"></div>
+                    <div id="rowsLoading" class="alert alert-info" style="display: none;">
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        Loading rows...
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover table-sm mb-0" id="pricesTable">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Recorded At (local)</th>
+                                    <th>Ticker</th>
+                                    <th class="text-end">Price (USD)</th>
+                                    <th>Service</th>
+                                    <th>Id</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pricesBody">
+                                <tr><td colspan="5" class="text-center text-muted">No rows loaded</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const statusBadge = document.getElementById('statusBadge');
+    const statusError = document.getElementById('statusError');
+    const saveMessage = document.getElementById('saveMessage');
+    const pricesBody = document.getElementById('pricesBody');
+    const rowsError = document.getElementById('rowsError');
+    const rowsLoading = document.getElementById('rowsLoading');
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function showMessage(el, text, kind) {
+        el.className = 'alert alert-' + kind + ' mt-3 mb-0';
+        el.textContent = text;
+        el.style.display = 'block';
+    }
+
+    async function loadStatus() {
+        statusBadge.className = 'badge bg-secondary';
+        statusBadge.textContent = 'Checking...';
+        statusError.style.display = 'none';
+        try {
+            const response = await fetch('/Schwab/GetPriceLogStatus');
+            const data = await response.json();
+
+            document.getElementById('statusDb').textContent = data.database || '--';
+            document.getElementById('statusVersion').textContent = data.serverVersion || '--';
+            document.getElementById('statusRows').textContent = data.connected ? data.rowCount.toLocaleString() : '--';
+            document.getElementById('statusLatency').textContent = data.latencyMs + ' ms';
+
+            if (data.connected) {
+                statusBadge.className = 'badge bg-success';
+                statusBadge.textContent = 'Connected';
+            } else {
+                statusBadge.className = 'badge bg-danger';
+                statusBadge.textContent = 'Disconnected';
+                statusError.textContent = data.error || 'Unknown error';
+                statusError.style.display = 'block';
+            }
+        } catch (error) {
+            statusBadge.className = 'badge bg-danger';
+            statusBadge.textContent = 'Error';
+            statusError.textContent = error.message;
+            statusError.style.display = 'block';
+        }
+    }
+
+    function renderRows(rows) {
+        if (!rows || rows.length === 0) {
+            pricesBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No prices saved yet</td></tr>';
+            return;
+        }
+        pricesBody.innerHTML = rows.map(row => {
+            const when = new Date(row.recordedAt).toLocaleString();
+            const price = Number(row.priceUsd).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+            const badgeClass = row.service === 'Schwab' ? 'bg-primary' : 'bg-warning text-dark';
+            return `<tr>
+                <td>${escapeHtml(when)}</td>
+                <td><strong>${escapeHtml(row.ticker)}</strong></td>
+                <td class="text-end">$${escapeHtml(price)}</td>
+                <td><span class="badge ${badgeClass}">${escapeHtml(row.service)}</span></td>
+                <td><code class="small">${escapeHtml(row.id)}</code></td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function loadRows() {
+        rowsError.style.display = 'none';
+        rowsLoading.style.display = 'block';
+        try {
+            const response = await fetch('/Schwab/GetRecentPrices?limit=50');
+            if (!response.ok) {
+                throw new Error(await response.text());
+            }
+            renderRows(await response.json());
+        } catch (error) {
+            rowsError.textContent = 'Error loading rows: ' + error.message;
+            rowsError.style.display = 'block';
+        } finally {
+            rowsLoading.style.display = 'none';
+        }
+    }
+
+    document.getElementById('savePriceForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const btn = document.getElementById('saveBtn');
+        const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+        const service = document.getElementById('service').value;
+        const password = document.getElementById('password')?.value || '';
+
+        if (!symbol) return;
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+        saveMessage.style.display = 'none';
+
+        try {
+            const body = new URLSearchParams({ symbol, service, password });
+            const response = await fetch('/Schwab/SavePrice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body
+            });
+
+            if (!response.ok) {
+                throw new Error(await response.text());
+            }
+
+            const saved = await response.json();
+            showMessage(saveMessage,
+                `Saved ${saved.ticker} @@ $${Number(saved.priceUsd).toFixed(2)} from ${saved.service} at ${new Date(saved.recordedAt).toLocaleString()}`,
+                'success');
+            await Promise.all([loadRows(), loadStatus()]);
+        } catch (error) {
+            showMessage(saveMessage, 'Error: ' + error.message, 'danger');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = 'Fetch &amp; Save Price';
+        }
+    });
+
+    document.getElementById('refreshStatusBtn').addEventListener('click', loadStatus);
+    document.getElementById('reloadRowsBtn').addEventListener('click', loadRows);
+
+    window.addEventListener('DOMContentLoaded', function () {
+        loadStatus();
+        loadRows();
+    });
+</script>

@@ -21,6 +21,7 @@ namespace SchwabOAuthApp
             builder.Services.AddSingleton<SchwabOAuthApp.Services.ITokenStorageService, SchwabOAuthApp.Services.TokenStorageService>();
             builder.Services.AddSingleton<SchwabOAuthApp.Services.IIpLoggerService, SchwabOAuthApp.Services.IpLoggerService>();
             builder.Services.AddScoped<MyApi.Services.SchwabOrderService>();
+            builder.Services.AddSingleton<SchwabOAuthApp.Services.IPriceSnapshotService, SchwabOAuthApp.Services.NeonPriceSnapshotService>();
             builder.Services.AddSession(options =>
             {
                 options.IdleTimeout = TimeSpan.FromHours(12);
